@@ -48,6 +48,18 @@ Override per machine with a git-ignored `CMakeUserPresets.json`.
 
 Add `C:/Qt/6.10.3/msvc2022_64/bin` to `PATH` so the Qt DLLs resolve.
 
+## Package (self-contained folder)
+
+```
+deploy.bat
+```
+
+Builds Release, then `cmake --install` stages `..\dist\DevManager\`:
+`devmanager-gui.exe` + `devmanager-scan.exe`, the Qt runtime bundled by
+`windeployqt`, and `config\*.json`. Copy that folder to a new PC and run it
+directly — no Qt install required. (If `windeployqt` isn't on `PATH` the
+install still succeeds but warns; add `C:/Qt/6.10.3/msvc2022_64/bin`.)
+
 ## Regression check vs the PowerShell reference
 
 ```
