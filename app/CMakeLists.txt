@@ -26,6 +26,7 @@ add_library(devmanager_core STATIC
     core/snapshot/snapshot_executor.cpp
     core/snapshot/snapshot_coordinator.cpp
     core/snapshot/snapshot_verify.cpp
+    core/snapshot/snapshot_diff.cpp
     core/snapshot/restore_executor.cpp
 )
 target_include_directories(devmanager_core PUBLIC core)
@@ -91,4 +92,8 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_snapshot_verify tests/tst_snapshot_verify.cpp)
     target_link_libraries(tst_snapshot_verify PRIVATE devmanager_core Qt6::Test)
     add_test(NAME snapshot_verify COMMAND tst_snapshot_verify)
+
+    add_executable(tst_snapshot_diff tests/tst_snapshot_diff.cpp)
+    target_link_libraries(tst_snapshot_diff PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME snapshot_diff COMMAND tst_snapshot_diff)
 endif()
