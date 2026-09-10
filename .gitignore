@@ -36,3 +36,6 @@ npm-debug.log*
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# gui dev screenshot
+ui-preview.png

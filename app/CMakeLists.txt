@@ -29,6 +29,7 @@ add_executable(devmanager-gui WIN32
     gui/main.cpp
     gui/app_controller.cpp
     gui/main_window.cpp
+    gui/theme.cpp
 )
 target_include_directories(devmanager-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(devmanager-gui PRIVATE

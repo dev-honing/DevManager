@@ -7,7 +7,9 @@ class QTreeWidget;
 class QTableWidget;
 class QLineEdit;
 class QLabel;
-class QAction;
+class QListWidget;
+class QStackedWidget;
+class QPushButton;
 
 namespace dm {
 
@@ -23,6 +25,9 @@ private slots:
 
 private:
     void buildUi();
+    QWidget* buildHeader();
+    QWidget* buildStatRow();
+    QWidget* wrapPage(QWidget* content);
     void populateEnvironment(const EnvironmentInventory& inv);
     void populateSkills(const EnvironmentInventory& inv);
     void populatePlugins(const EnvironmentInventory& inv);
@@ -31,8 +36,15 @@ private:
 
     AppController m_controller;
 
-    QAction* m_scanAction = nullptr;
-    QLabel* m_summary = nullptr;
+    QPushButton* m_scanButton = nullptr;
+    QLabel* m_headerStatus = nullptr;
+    QListWidget* m_nav = nullptr;
+    QStackedWidget* m_stack = nullptr;
+
+    QLabel* m_statTools = nullptr;
+    QLabel* m_statSkills = nullptr;
+    QLabel* m_statLinked = nullptr;
+    QLabel* m_statPackages = nullptr;
 
     QTreeWidget* m_envTree = nullptr;
     QTreeWidget* m_skillTree = nullptr;
