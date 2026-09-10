@@ -78,6 +78,7 @@ struct EnvironmentInventory {
     int schemaVersion = 5;
     QString snapshotVersion = QStringLiteral("5.0-dev");
     QString producedBy = QStringLiteral("DevManager-scan/0.1 (C++/Qt6)");
+    QString configSource;   // config/scan.json path, or "" for built-in defaults
     QString capturedAt;     // ISO-8601
     QString machine;
     QString userProfile;
@@ -87,8 +88,9 @@ struct EnvironmentInventory {
     QString osVersion;
     bool os64Bit = true;
 
-    QMap<QString, QString> tools;   // docker,node,npm,python,cmake,git,claude,codex,headroom,omniroute
-    QMap<QString, QString> toolPaths;   // same keys -> resolved executable path (UI only)
+    QMap<QString, QString> tools;         // config tool id -> version string
+    QMap<QString, QString> toolPaths;     // config tool id -> resolved executable path
+    QMap<QString, QString> toolCategories;// config tool id -> category (UI grouping)
     QString qt;
     QString visualStudio;
     WslInfo wsl;

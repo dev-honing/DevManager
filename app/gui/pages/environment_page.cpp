@@ -10,6 +10,7 @@
 #include <QClipboard>
 #include <QDesktopServices>
 #include <QFileInfo>
+#include <QHash>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -28,31 +29,48 @@ struct Row {
     QString path;
 };
 
-// category id -> ordered tool keys pulled from the inventory
+QString prettyCategory(const QString& id)
+{
+    if (id.isEmpty())
+        return "Other";
+    static const QHash<QString, QString> special{
+        {"ai", "AI Tools"}, {"vcs", "VCS"}, {"js", "JavaScript"}, {"ml", "ML"}};
+    if (special.contains(id.toLower()))
+        return special.value(id.toLower());
+    QString s = id;
+    s[0] = s[0].toUpper();
+    return s;
+}
+
+// Rows for a category: every configured tool tagged with it, plus the
+// synthetic entries that have no command of their own.
 QVector<Row> rowsFor(const QString& cat, const EnvironmentInventory& inv)
 {
-    auto t = [&](const char* k) {
-        return Row{k, inv.tools.value(k), inv.toolPaths.value(k)};
-    };
-    if (cat == "tools")
-        return {t("claude"), t("codex"), t("headroom"), t("omniroute")};
-    if (cat == "runtimes")
-        return {t("node"), t("npm"), t("python")};
-    if (cat == "ai")
-        return {t("claude"), t("codex"), t("headroom"), t("omniroute")};
-    if (cat == "containers") {
-        QVector<Row> r{t("docker")};
-        QString wsl = inv.wsl.installed ? "installed" : "";
-        if (!inv.wsl.distributions.isEmpty())
-            wsl = inv.wsl.distributions.first().state.toLower()
-                  + " (" + QString::number(inv.wsl.distributions.size()) + " distro)";
-        r.push_back({"wsl", wsl, {}});
-        return r;
+    QVector<Row> rows;
+    for (auto it = inv.toolCategories.constBegin();
+         it != inv.toolCategories.constEnd(); ++it) {
+        if (it.value() != cat)
+            continue;
+        rows.push_back({it.key(), inv.tools.value(it.key()),
+                        inv.toolPaths.value(it.key())});
     }
-    // build
-    return {t("cmake"), t("git"),
-            Row{"qt", inv.qt, {}},
-            Row{"visual studio", inv.visualStudio, {}}};
+    std::sort(rows.begin(), rows.end(),
+              [](const Row& a, const Row& b) { return a.name < b.name; });
+
+    if (cat == "build") {
+        rows.push_back({"qt", inv.qt, {}});
+        rows.push_back({"visual studio", inv.visualStudio, {}});
+    }
+    if (cat == "containers") {
+        QString wsl;
+        if (!inv.wsl.distributions.isEmpty())
+            wsl = inv.wsl.distributions.first().state.toLower() + " ("
+                  + QString::number(inv.wsl.distributions.size()) + " distro)";
+        else if (inv.wsl.installed)
+            wsl = "installed";
+        rows.push_back({"wsl", wsl, {}});
+    }
+    return rows;
 }
 } // namespace
 
@@ -96,12 +114,7 @@ EnvironmentPage::EnvironmentPage(QWidget* parent) : QWidget(parent)
     lay->addWidget(m_machine);
 
     // segmented nav
-    m_segments = new SegmentedControl;
-    m_segments->addSegment("tools", "Tools");
-    m_segments->addSegment("build", "Build");
-    m_segments->addSegment("runtimes", "Runtimes");
-    m_segments->addSegment("containers", "Containers");
-    m_segments->addSegment("ai", "AI Tools");
+    m_segments = new SegmentedControl;   // segments are built per-scan from config
     connect(m_segments, &SegmentedControl::changed, this, &EnvironmentPage::renderCategory);
     lay->addWidget(m_segments);
 
@@ -135,7 +148,26 @@ void EnvironmentPage::setInventory(const EnvironmentInventory& inv)
     m_inv = inv;
     m_machine->setRows(inv.machine, inv.userProfile,
                        inv.osCaption + "  (" + inv.osVersion + ")");
-    renderCategory(m_segments->current().isEmpty() ? "tools" : m_segments->current());
+
+    // Build the category segments from whatever the config actually defines.
+    QStringList cats;
+    for (auto it = inv.toolCategories.constBegin();
+         it != inv.toolCategories.constEnd(); ++it)
+        if (!cats.contains(it.value()))
+            cats << it.value();
+    for (const QString& forced : {QStringLiteral("build"), QStringLiteral("containers")})
+        if (!cats.contains(forced))
+            cats << forced;                 // qt/vs and wsl live here
+    cats.sort();
+
+    const QString prev = m_segments->current();
+    m_segments->clear();
+    for (const QString& c : cats)
+        m_segments->addSegment(c, prettyCategory(c));
+    if (cats.contains(prev))
+        m_segments->setCurrent(prev);
+    else if (!cats.isEmpty())
+        renderCategory(m_segments->current());
 }
 
 void EnvironmentPage::renderCategory(const QString& id)

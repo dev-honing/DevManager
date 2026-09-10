@@ -46,6 +46,18 @@ void SegmentedControl::addSegment(const QString& id, const QString& text, bool e
     }
 }
 
+void SegmentedControl::clear()
+{
+    const auto btns = m_group->buttons();
+    for (auto* b : btns) {
+        m_group->removeButton(b);
+        m_lay->removeWidget(b);
+        delete b;
+    }
+    m_current.clear();
+    m_nextId = 0;
+}
+
 void SegmentedControl::setCurrent(const QString& id)
 {
     for (auto* btn : m_group->buttons()) {

@@ -12,6 +12,7 @@
 #include <QJsonObject>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
+#include <QSet>
 #include <QStandardPaths>
 #include <QSysInfo>
 
@@ -29,56 +30,70 @@ static QString versionOf(const QString& exe, const QStringList& args = {"--versi
     return r.started ? r.firstLine() : QString();
 }
 
-QMap<QString, QString> EnvironmentScanner::scanTools()
+EnvironmentScanner::ToolScan EnvironmentScanner::scanTools(const ScanConfig& cfg)
 {
-    QMap<QString, QString> t;
-    for (const char* name : {"docker", "node", "npm", "python", "cmake", "git",
-                             "claude", "codex"})
-        t.insert(name, versionOf(name));
+    ToolScan out;
+    for (const ToolSpec& spec : cfg.tools) {
+        QString exe = QStandardPaths::findExecutable(spec.id);
+        if (exe.isEmpty()) {
+            for (const QString& fb : spec.fallbackPaths) {
+                const QString p = path::expand(fb);
+                if (!p.isEmpty() && QFileInfo::exists(p)) {
+                    exe = p;
+                    break;
+                }
+            }
+        }
+        if (exe.isEmpty())
+            continue;   // not installed -> not listed
 
-    QString headroom = QStandardPaths::findExecutable("headroom");
-    if (headroom.isEmpty()) {
-        const QString fb = path::homeDir() + "/.local/bin/headroom.exe";
-        if (QFileInfo::exists(fb))
-            headroom = fb;
+        const ProcessResult r = ProcessRunner::run(exe, spec.versionArgs, 8000);
+        QString ver;
+        if (r.started) {
+            // Some CLIs (e.g. ollama with its server down) emit warning lines
+            // around the real version. Prefer a line that carries a version
+            // number, then any non-warning line, then whatever came first.
+            static const QRegularExpression verLike("\\d+\\.\\d+");
+            const QStringList lines = r.outText().split('\n', Qt::SkipEmptyParts);
+            QString firstNonWarning;
+            for (const QString& line : lines) {
+                const QString t = line.trimmed();
+                const bool warn = t.startsWith("warning", Qt::CaseInsensitive)
+                                  || t.startsWith("error", Qt::CaseInsensitive);
+                if (verLike.match(t).hasMatch()) { ver = t; break; }
+                if (!warn && firstNonWarning.isEmpty())
+                    firstNonWarning = t;
+            }
+            if (ver.isEmpty())
+                ver = !firstNonWarning.isEmpty() ? firstNonWarning : r.firstLine();
+            ver.remove(QRegularExpression("^(warning|error):\\s*",
+                                          QRegularExpression::CaseInsensitiveOption));
+        }
+        out.versions.insert(spec.id, ver);
+        out.paths.insert(spec.id, QDir::toNativeSeparators(exe));
+        out.categories.insert(spec.id, spec.category);
     }
-    if (!headroom.isEmpty())
-        t.insert("headroom", ProcessRunner::run(headroom, {"--version"}, 8000).firstLine());
-
-    t.insert("omniroute", versionOf("omniroute"));
-    return t;
+    return out;
 }
 
-QMap<QString, QString> EnvironmentScanner::scanToolPaths()
+QString EnvironmentScanner::scanQt(const ScanConfig& cfg)
 {
-    QMap<QString, QString> paths;
-    for (const char* name : {"docker", "node", "npm", "python", "cmake", "git",
-                             "claude", "codex", "omniroute"}) {
-        const QString p = QStandardPaths::findExecutable(name);
-        if (!p.isEmpty())
-            paths.insert(name, QDir::toNativeSeparators(p));
-    }
-    QString hr = QStandardPaths::findExecutable("headroom");
-    if (hr.isEmpty()) {
-        const QString fb = path::homeDir() + "/.local/bin/headroom.exe";
-        if (QFileInfo::exists(fb))
-            hr = fb;
-    }
-    if (!hr.isEmpty())
-        paths.insert("headroom", QDir::toNativeSeparators(hr));
-    return paths;
-}
-
-QString EnvironmentScanner::scanQt()
-{
-    QDir qt("C:/Qt");
-    if (!qt.exists())
-        return {};
     static const QRegularExpression re("^\\d+\\.\\d+");
     QStringList versions;
-    for (const QString& d : qt.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-        if (re.match(d).hasMatch())
-            versions << d;
+    QSet<QString> seen;
+    for (const QString& raw : cfg.qtSearchPaths) {
+        const QString dirPath = path::expand(raw);
+        if (dirPath.isEmpty())
+            continue;
+        QDir qt(dirPath);
+        if (!qt.exists())
+            continue;
+        for (const QString& d : qt.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+            if (re.match(d).hasMatch() && !seen.contains(d)) {
+                seen.insert(d);
+                versions << d;
+            }
+        }
     }
     return versions.join(", ");
 }
@@ -138,63 +153,48 @@ WslInfo EnvironmentScanner::scanWsl()
     return info;
 }
 
-QList<Package> EnvironmentScanner::scanGlobalPackages()
+QList<Package> EnvironmentScanner::scanGlobalPackages(const ScanConfig& cfg)
 {
     QList<Package> pkgs;
 
-    // npm ls -g --depth=0 --json  ->  .dependencies
-    {
-        const QString npm = QStandardPaths::findExecutable("npm");
-        if (!npm.isEmpty()) {
-            const ProcessResult r =
-                ProcessRunner::run(npm, {"ls", "-g", "--depth=0", "--json"}, 20000);
-            const QJsonObject deps =
-                QJsonDocument::fromJson(r.out).object().value("dependencies").toObject();
-            QList<Package> npmPkgs;
-            for (auto it = deps.constBegin(); it != deps.constEnd(); ++it) {
-                Package p;
-                p.manager = "npm";
-                p.name = it.key();
-                p.version = it.value().toObject().value("version").toString();
-                p.restorePolicy = "inventory-only";
-                npmPkgs.append(p);
-            }
-            std::sort(npmPkgs.begin(), npmPkgs.end(),
-                      [](const Package& a, const Package& b) { return a.name < b.name; });
-            pkgs += npmPkgs;
-        }
-    }
+    for (const PackageManagerSpec& m : cfg.packageManagers) {
+        // "pip" is invoked as `python -m pip ...`; everything else by its own id.
+        const QString exeName = (m.id == "pip") ? QStringLiteral("python") : m.id;
+        const QString exe = QStandardPaths::findExecutable(exeName);
+        if (exe.isEmpty())
+            continue;
 
-    // python -m pip list --format=json
-    {
-        const QString py = QStandardPaths::findExecutable("python");
-        if (!py.isEmpty()) {
-            const ProcessResult r =
-                ProcessRunner::run(py, {"-m", "pip", "list", "--format=json"}, 20000);
-            QList<Package> pipPkgs;
+        const ProcessResult r = ProcessRunner::run(exe, m.listArgs, 20000);
+        QList<Package> found;
+
+        if (m.parseMode == "npm-deps") {
+            const QJsonObject deps = QJsonDocument::fromJson(r.out)
+                                         .object().value("dependencies").toObject();
+            for (auto it = deps.constBegin(); it != deps.constEnd(); ++it)
+                found.append({m.id, it.key(),
+                              it.value().toObject().value("version").toString(),
+                              "inventory-only"});
+        } else if (m.parseMode == "pip-list") {
             for (const QJsonValue& v : QJsonDocument::fromJson(r.out).array()) {
                 const QJsonObject o = v.toObject();
-                Package p;
-                p.manager = "pip";
-                p.name = o.value("name").toString();
-                p.version = o.value("version").toString();
-                p.restorePolicy = "inventory-only";
-                pipPkgs.append(p);
+                found.append({m.id, o.value("name").toString(),
+                              o.value("version").toString(), "inventory-only"});
             }
-            std::sort(pipPkgs.begin(), pipPkgs.end(),
-                      [](const Package& a, const Package& b) { return a.name < b.name; });
-            pkgs += pipPkgs;
         }
-    }
 
+        std::sort(found.begin(), found.end(),
+                  [](const Package& a, const Package& b) { return a.name < b.name; });
+        pkgs += found;
+    }
     return pkgs;
 }
 
-bool EnvironmentScanner::isSecretName(const QString& name)
+bool EnvironmentScanner::isSecretName(const QString& name, const QStringList& patterns)
 {
-    static const QRegularExpression re(
-        "KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH|PRIVATE",
-        QRegularExpression::CaseInsensitiveOption);
+    if (patterns.isEmpty())
+        return false;
+    const QRegularExpression re(patterns.join('|'),
+                                QRegularExpression::CaseInsensitiveOption);
     return re.match(name).hasMatch();
 }
 
@@ -207,19 +207,19 @@ QString EnvironmentScanner::maskSecret(const QString& value)
     return value.left(4) + "..." + value.right(4);
 }
 
-QMap<QString, QString> EnvironmentScanner::scanEnv()
+QMap<QString, QString> EnvironmentScanner::scanEnv(const ScanConfig& cfg)
 {
-    // Case-insensitive to match PowerShell's -match semantics (v4.1).
-    static const QRegularExpression keep(
-        "ANTHROPIC|CLAUDE|CODEX|OMNIROUTE|HEADROOM|DOCKER|QT|CMAKE|GEMINI",
-        QRegularExpression::CaseInsensitiveOption);
+    if (cfg.envInclude.isEmpty())
+        return {};
+    const QRegularExpression keep(cfg.envInclude.join('|'),
+                                  QRegularExpression::CaseInsensitiveOption);
     QMap<QString, QString> out;
     const auto env = QProcessEnvironment::systemEnvironment();
     for (const QString& name : env.keys()) {
         if (!keep.match(name).hasMatch())
             continue;
         QString v = env.value(name);
-        if (isSecretName(name))
+        if (isSecretName(name, cfg.envSecret))
             v = maskSecret(v);
         out.insert(name, v);
     }
@@ -240,9 +240,14 @@ EnvironmentInventory EnvironmentScanner::scan()
     inv.osVersion = QSysInfo::productVersion();
     inv.os64Bit = QSysInfo::currentCpuArchitecture().contains("64");
 
-    inv.tools = scanTools();
-    inv.toolPaths = scanToolPaths();
-    inv.qt = scanQt();
+    const ScanConfig cfg = ScanConfig::load();
+    inv.configSource = cfg.sourcePath;
+
+    const ToolScan ts = scanTools(cfg);
+    inv.tools = ts.versions;
+    inv.toolPaths = ts.paths;
+    inv.toolCategories = ts.categories;
+    inv.qt = scanQt(cfg);
     inv.visualStudio = scanVisualStudio();
     inv.wsl = scanWsl();
 
@@ -252,9 +257,9 @@ EnvironmentInventory EnvironmentScanner::scan()
     inv.pluginRoots = plugins.roots;
     inv.skills = skills.items;
     inv.plugins = plugins.items;
-    inv.globalPackages = scanGlobalPackages();
+    inv.globalPackages = scanGlobalPackages(cfg);
 
-    inv.env = scanEnv();
+    inv.env = scanEnv(cfg);
     return inv;
 }
 

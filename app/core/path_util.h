@@ -8,6 +8,10 @@ namespace dm::path {
 QString homeDir();                       // %USERPROFILE% (or QDir::homePath fallback)
 QString normalizeLower(const QString& p);
 
+// Expand a leading "~" and any $VAR / ${VAR} against the process environment.
+// Returns an empty string if a referenced variable is unset.
+QString expand(const QString& p);
+
 // Reparse-point inspection via QFileInfo (Qt distinguishes junction vs symlink).
 LinkInfo probeLink(const QString& path);
 

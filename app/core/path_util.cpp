@@ -2,8 +2,9 @@
 
 #include <QDir>
 #include <QFileInfo>
-#include <QSet>
 #include <QProcessEnvironment>
+#include <QRegularExpression>
+#include <QSet>
 
 namespace dm::path {
 
@@ -19,6 +20,32 @@ QString homeDir()
 QString normalizeLower(const QString& p)
 {
     return QDir::cleanPath(QDir::fromNativeSeparators(p)).toLower();
+}
+
+QString expand(const QString& p)
+{
+    if (p.isEmpty())
+        return p;
+    QString s = p;
+    if (s == "~" || s.startsWith("~/") || s.startsWith("~\\"))
+        s = homeDir() + s.mid(1);
+
+    static const QRegularExpression var(R"(\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*))");
+    const auto env = QProcessEnvironment::systemEnvironment();
+    QString out;
+    qsizetype last = 0;
+    auto it = var.globalMatch(s);
+    while (it.hasNext()) {
+        const auto m = it.next();
+        out += s.mid(last, m.capturedStart() - last);
+        const QString name = m.captured(1).isEmpty() ? m.captured(2) : m.captured(1);
+        if (!env.contains(name))
+            return {};                       // unresolved -> caller skips this path
+        out += env.value(name);
+        last = m.capturedEnd();
+    }
+    out += s.mid(last);
+    return QDir::fromNativeSeparators(out);
 }
 
 LinkInfo probeLink(const QString& path)

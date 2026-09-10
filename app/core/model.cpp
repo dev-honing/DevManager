@@ -116,6 +116,9 @@ QJsonObject EnvironmentInventory::toJson() const
                }},
         {"tools", mapToJson(tools)},
         {"toolPaths", mapToJson(toolPaths)},
+        {"toolCategories", mapToJson(toolCategories)},
+        {"configSource", configSource.isEmpty() ? QJsonValue("(built-in defaults)")
+                                                : QJsonValue(configSource)},
         {"qt", qt.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(qt)},
         {"visualStudio", visualStudio.isEmpty() ? QJsonValue(QJsonValue::Null)
                                                 : QJsonValue(visualStudio)},

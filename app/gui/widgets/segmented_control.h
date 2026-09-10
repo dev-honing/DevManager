@@ -11,6 +11,7 @@ class SegmentedControl : public QWidget {
 public:
     explicit SegmentedControl(QWidget* parent = nullptr);
     void addSegment(const QString& id, const QString& text, bool enabled = true);
+    void clear();
     void setCurrent(const QString& id);
     QString current() const { return m_current; }
 

@@ -14,6 +14,7 @@ add_library(devmanager_core STATIC
     core/process_runner.cpp
     core/path_util.cpp
     core/json_io.cpp
+    core/config/scan_config.cpp
     core/scan/skill_scanner.cpp
     core/scan/env_scanner.cpp
     core/service/service_probe.cpp
