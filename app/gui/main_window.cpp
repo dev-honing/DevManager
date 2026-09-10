@@ -60,7 +60,8 @@ static QTreeWidgetItem* section(QTreeWidget* t, const QString& name)
 
 static void kv(QTreeWidgetItem* parent, const QString& k, const QString& v)
 {
-    new QTreeWidgetItem(parent, {k, v});
+    auto* it = new QTreeWidgetItem(parent, {k, v});
+    it->setFont(1, monoFont());
 }
 
 // ---------------------------------------------------------------- window
@@ -86,6 +87,7 @@ QWidget* MainWindow::buildHeader()
 
     auto* title = new QLabel("DevManager");
     title->setObjectName("appTitle");
+    title->setFont(uiFont(17, QFont::DemiBold, /*display=*/true));
 
     m_headerStatus = new QLabel("idle");
     m_headerStatus->setObjectName("headerStatus");
@@ -111,6 +113,7 @@ static QFrame* statCard(const QString& caption, QLabel** valueOut)
     lay->setSpacing(2);
     auto* value = new QLabel("-");
     value->setObjectName("statValue");
+    value->setFont(uiFont(25, QFont::Bold, /*display=*/true));
     auto* cap = new QLabel(caption);
     cap->setObjectName("statCaption");
     lay->addWidget(value);
@@ -275,6 +278,8 @@ void MainWindow::populateSkills(const EnvironmentInventory& inv)
                 top, {l.host, l.classification,
                       l.link.isLink ? l.link.linkType : QStringLiteral("-"),
                       l.link.isLink ? l.link.target : QString(), git});
+            row->setFont(3, monoFont());
+            row->setFont(4, monoFont());
             if (l.link.isLink)
                 for (int c = 0; c < 5; ++c)
                     row->setForeground(c, accent);
@@ -295,10 +300,12 @@ void MainWindow::populatePlugins(const EnvironmentInventory& inv)
     for (const auto& p : inv.plugins) {
         auto* top = new QTreeWidgetItem(m_pluginTree, {p.name});
         top->setExpanded(true);
-        for (const auto& l : p.locations)
-            new QTreeWidgetItem(top, {l.host, l.classification,
-                                      l.link.isLink ? l.link.linkType : QStringLiteral("-"),
-                                      l.path});
+        for (const auto& l : p.locations) {
+            auto* row = new QTreeWidgetItem(
+                top, {l.host, l.classification,
+                      l.link.isLink ? l.link.linkType : QStringLiteral("-"), l.path});
+            row->setFont(3, monoFont());
+        }
     }
 }
 
@@ -309,7 +316,9 @@ void MainWindow::populatePackages(const EnvironmentInventory& inv)
         const auto& p = inv.globalPackages.at(i);
         m_packageTable->setItem(i, 0, new QTableWidgetItem(p.manager));
         m_packageTable->setItem(i, 1, new QTableWidgetItem(p.name));
-        m_packageTable->setItem(i, 2, new QTableWidgetItem(p.version));
+        auto* ver = new QTableWidgetItem(p.version);
+        ver->setFont(monoFont());
+        m_packageTable->setItem(i, 2, ver);
     }
     m_packageTable->resizeColumnToContents(0);
     m_packageTable->resizeColumnToContents(1);
@@ -322,7 +331,9 @@ void MainWindow::populateEnvVars(const EnvironmentInventory& inv)
     int r = 0;
     for (auto it = inv.env.constBegin(); it != inv.env.constEnd(); ++it, ++r) {
         m_envVarTable->setItem(r, 0, new QTableWidgetItem(it.key()));
-        m_envVarTable->setItem(r, 1, new QTableWidgetItem(it.value()));
+        auto* val = new QTableWidgetItem(it.value());
+        val->setFont(monoFont());
+        m_envVarTable->setItem(r, 1, val);
     }
     m_envVarTable->resizeColumnToContents(0);
 }

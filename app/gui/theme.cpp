@@ -3,10 +3,43 @@
 #include <QApplication>
 #include <QColor>
 #include <QFont>
+#include <QFontDatabase>
 #include <QPalette>
 #include <QStyleFactory>
 
 namespace dm {
+
+static QString pickFamily(std::initializer_list<QString> candidates,
+                          const QString& fallback)
+{
+    const auto have = QFontDatabase::families();
+    for (const QString& c : candidates)
+        if (have.contains(c, Qt::CaseInsensitive))
+            return c;
+    return fallback;
+}
+
+QFont uiFont(int pointSize, int weight, bool display)
+{
+    static const QString textFam =
+        pickFamily({"Segoe UI Variable Text", "Segoe UI Variable"}, "Segoe UI");
+    static const QString dispFam =
+        pickFamily({"Segoe UI Variable Display", "Segoe UI Variable"}, "Segoe UI");
+    QFont f(display ? dispFam : textFam, pointSize, weight);
+    f.setStyleStrategy(QFont::PreferAntialias);
+    if (display)
+        f.setLetterSpacing(QFont::AbsoluteSpacing, -0.3);
+    return f;
+}
+
+QFont monoFont(int pointSize)
+{
+    static const QString fam =
+        pickFamily({"Cascadia Mono", "Cascadia Code", "JetBrains Mono"}, "Consolas");
+    QFont f(fam, pointSize);
+    f.setStyleHint(QFont::Monospace);
+    return f;
+}
 
 namespace {
 constexpr const char* kAccent = "#3b82f6";
@@ -23,13 +56,7 @@ const char* accentHex() { return kAccent; }
 void applyModernTheme(QApplication& app)
 {
     app.setStyle(QStyleFactory::create("Fusion"));
-
-    QFont f = app.font();
-#ifdef Q_OS_WIN
-    f.setFamily("Segoe UI");
-#endif
-    f.setPointSize(10);
-    app.setFont(f);
+    app.setFont(uiFont(10));
 
     QPalette p;
     p.setColor(QPalette::Window, QColor(kBg));
@@ -54,8 +81,8 @@ void applyModernTheme(QApplication& app)
         QMainWindow, QDialog { background: %(bg); }
 
         #header { background: %(bg); border-bottom: 1px solid %(border); }
-        #appTitle { font-size: 16px; font-weight: 600; letter-spacing: 0.3px; }
-        #headerStatus { color: %(muted); }
+        #appTitle { font-size: 17px; font-weight: 600; }
+        #headerStatus { color: %(muted); font-size: 12px; }
 
         QPushButton#primaryBtn {
             background: %(accent); color: #ffffff; border: none;
@@ -68,9 +95,9 @@ void applyModernTheme(QApplication& app)
             background: %(panel); border: 1px solid %(border);
             border-radius: 10px;
         }
-        #statValue { font-size: 22px; font-weight: 700; }
-        #statCaption { color: %(muted); font-size: 11px; text-transform: uppercase;
-                       letter-spacing: 0.6px; }
+        #statValue { font-size: 25px; font-weight: 700; }
+        #statCaption { color: %(muted); font-size: 10px; text-transform: uppercase;
+                       letter-spacing: 0.8px; }
 
         QListWidget#nav {
             background: %(bg); border: none; border-right: 1px solid %(border);
@@ -78,6 +105,7 @@ void applyModernTheme(QApplication& app)
         }
         QListWidget#nav::item {
             padding: 9px 14px; border-radius: 7px; margin: 2px 0; color: %(muted);
+            font-size: 13px;
         }
         QListWidget#nav::item:hover { background: %(panel2); color: %(text); }
         QListWidget#nav::item:selected {
@@ -98,7 +126,8 @@ void applyModernTheme(QApplication& app)
         }
         QHeaderView::section {
             background: %(panel); color: %(muted); border: none;
-            border-bottom: 1px solid %(border); padding: 8px 8px; font-weight: 600;
+            border-bottom: 1px solid %(border); padding: 9px 8px; font-weight: 600;
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
         }
         QTreeView::branch { background: %(panel); }
 
