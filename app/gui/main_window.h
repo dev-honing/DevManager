@@ -31,6 +31,7 @@ private slots:
     void onScanFinished(const dm::EnvironmentInventory& inv);
     void onServicesProbed(const QList<dm::ServiceState>& services);
     void onNavSelected(const QString& id);
+    void onSidebarAction(const QString& id);
 
 protected:
     void resizeEvent(QResizeEvent* e) override;
@@ -60,6 +61,7 @@ private:
     RestorePage* m_restorePage = nullptr;
 
     QString m_backupsDir;
+    QString m_configSource;
     QList<dm::ServiceState> m_lastServices;
     void refreshMigrationPages();
 };

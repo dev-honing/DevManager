@@ -13,11 +13,18 @@ int main(int argc, char** argv)
 
     dm::applyModernTheme(app);
 
+    const QStringList args = app.arguments();
+
     dm::MainWindow w;
+    const int wi = args.indexOf("--shot-size");   // dev: "--shot-size 980x700"
+    if (wi >= 0 && wi + 1 < args.size()) {
+        const QStringList wh = args.at(wi + 1).split('x');
+        if (wh.size() == 2)
+            w.resize(wh[0].toInt(), wh[1].toInt());
+    }
     w.show();
 
     // dev affordance:  --shot <png>  renders one frame after the first scan and exits
-    const QStringList args = app.arguments();
     const int si = args.indexOf("--shot");
     if (si >= 0 && si + 1 < args.size()) {
         const QString path = args.at(si + 1);
@@ -28,13 +35,9 @@ int main(int argc, char** argv)
             if (!nav.isEmpty())
                 w.selectPage(nav);
             if (dry) {
-                bool clicked = false;
                 for (auto* b : w.findChildren<QPushButton*>("dryCheckBtn"))
-                    if (b->isVisible() && b->isEnabled()) {
+                    if (b->isVisible() && b->isEnabled())
                         b->click();
-                        clicked = true;
-                    }
-                fprintf(stderr, "shot-dryrun: clicked=%d\n", clicked);
             }
             QTimer::singleShot(dry ? 12000 : 400, &w, [&w, path] {
                 w.grab().save(path);

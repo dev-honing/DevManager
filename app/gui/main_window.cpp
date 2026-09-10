@@ -18,6 +18,8 @@
 #include <QDesktopServices>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QLabel>
+#include <QMessageBox>
 #include <QResizeEvent>
 #include <QStackedWidget>
 #include <QStatusBar>
@@ -63,6 +65,7 @@ void MainWindow::buildUi()
     m_sidebar->addFooterItem("docs", "docs", "Documentation");
     m_sidebar->addFooterItem("about", "about", "About");
     connect(m_sidebar, &Sidebar::selected, this, &MainWindow::onNavSelected);
+    connect(m_sidebar, &Sidebar::actionSelected, this, &MainWindow::onSidebarAction);
 
     m_cardTools = new SummaryCard("cpu", "Tools", Color::Primary);
     m_cardSkills = new SummaryCard("skills", "Skills", Color::Success);
@@ -138,6 +141,30 @@ void MainWindow::resizeEvent(QResizeEvent* e)
     QMainWindow::resizeEvent(e);
     if (m_rightPanel)
         m_rightPanel->setVisible(width() >= 1160);
+    if (m_topBar)
+        m_topBar->setCompact(width() < 1000);
+}
+
+void MainWindow::onSidebarAction(const QString& id)
+{
+    if (id == "docs") {
+        QDesktopServices::openUrl(
+            QUrl("https://github.com/dev-honing/DevManager"));
+    } else if (id == "about") {
+        QMessageBox box(this);
+        box.setWindowTitle("About DevManager");
+        box.setTextFormat(Qt::RichText);
+        box.setText(
+            "<b>DevManager</b><br>AI dev environment dashboard<br><br>"
+            "Qt " + QString(qVersion())
+            + "<br>config: <code>"
+            + (m_configSource.isEmpty() ? "built-in defaults" : m_configSource)
+            + "</code><br><br>"
+            "<a href='https://github.com/dev-honing/DevManager'>"
+            "github.com/dev-honing/DevManager</a>");
+        box.setTextInteractionFlags(Qt::TextBrowserInteraction);
+        box.exec();
+    }
 }
 
 void MainWindow::onServicesProbed(const QList<ServiceState>& services)
@@ -201,12 +228,16 @@ void MainWindow::onScanFinished(const EnvironmentInventory& inv)
     m_rightPanel->setSnapshots(SnapshotIndex::list(m_backupsDir));
     refreshMigrationPages();
 
+    m_configSource = inv.configSource;
     m_topBar->setBusy(false);
     m_topBar->setLastScanned(inv.capturedAt);
+
+    const QString cfg = inv.configSource.isEmpty()
+                            ? QStringLiteral("built-in defaults")
+                            : QFileInfo(inv.configSource).fileName();
     statusBar()->showMessage(inv.machine + "  •  " + inv.osCaption
-                             + (inv.configSource.isEmpty()
-                                    ? QString()
-                                    : "   ·   config: " + inv.configSource));
+                             + "   ·   config: " + cfg);
+    statusBar()->setToolTip(inv.configSource);
 }
 
 } // namespace dm

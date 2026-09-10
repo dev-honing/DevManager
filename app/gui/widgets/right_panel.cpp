@@ -57,25 +57,31 @@ RightPanel::RightPanel(QWidget* parent) : QWidget(parent)
     al->setContentsMargins(0, 0, 0, 0);
     al->setSpacing(6);
 
-    auto mkBtn = [&](const QString& text, const QString& icon, bool primary) {
+    auto mkBtn = [&](const QString& text, const QString& icon, bool primary,
+                     const QString& tip) {
         auto* b = new QPushButton("  " + text);
         b->setObjectName(primary ? "primaryBtn" : "secondaryBtn");
         b->setIcon(icons::icon(icon, QColor(primary ? "#ffffff" : Color::TextSecondary), 14));
         b->setCursor(Qt::PointingHandCursor);
         b->setLayoutDirection(Qt::LeftToRight);
+        b->setToolTip(tip);
         al->addWidget(b);
         return b;
     };
-    connect(mkBtn("Scan Environment", "refresh", true), &QPushButton::clicked,
-            this, &RightPanel::scanRequested);
-    connect(mkBtn("Create Snapshot", "snapshots", false), &QPushButton::clicked,
-            this, [this] { emit navigateTo("snapshots"); });
-    connect(mkBtn("Restore from Snapshot", "restore", false), &QPushButton::clicked,
-            this, [this] { emit navigateTo("restore"); });
-    connect(mkBtn("Manage Skills", "skills", false), &QPushButton::clicked,
-            this, [this] { emit navigateTo("skills"); });
-    connect(mkBtn("Open Dev Folder", "folder", false), &QPushButton::clicked,
-            this, &RightPanel::openDevFolderRequested);
+    connect(mkBtn("Scan Environment", "refresh", true,
+                  "Re-run the read-only environment scan"),
+            &QPushButton::clicked, this, &RightPanel::scanRequested);
+    connect(mkBtn("Create Snapshot", "snapshots", false,
+                  "Open the Snapshots page (dry check)"),
+            &QPushButton::clicked, this, [this] { emit navigateTo("snapshots"); });
+    connect(mkBtn("Restore from Snapshot", "restore", false,
+                  "Open the Restore page (dry check)"),
+            &QPushButton::clicked, this, [this] { emit navigateTo("restore"); });
+    connect(mkBtn("Manage Skills", "skills", false, "Open the Skills page"),
+            &QPushButton::clicked, this, [this] { emit navigateTo("skills"); });
+    connect(mkBtn("Open Dev Folder", "folder", false,
+                  "Open the project folder in Explorer"),
+            &QPushButton::clicked, this, &RightPanel::openDevFolderRequested);
     outer->addWidget(section("Quick Actions", actionsBody));
 
     // --- Recent Snapshots

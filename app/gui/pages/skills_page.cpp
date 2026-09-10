@@ -52,6 +52,7 @@ SkillsPage::SkillsPage(QWidget* parent) : QWidget(parent)
     lay->addWidget(m_filter);
 
     m_table = new QTableWidget;
+    m_table->setTextElideMode(Qt::ElideMiddle);
     m_table->setColumnCount(4);
     m_table->setHorizontalHeaderLabels({"Name", "Type", "Hosts", "Locations"});
     m_table->verticalHeader()->setVisible(false);
@@ -123,7 +124,9 @@ void SkillsPage::rebuild()
         name->setFont(uiFont(10, QFont::DemiBold));
         m_table->setItem(row, 0, name);
         m_table->setCellWidget(row, 1, TagBadge::cell(TagBadge::forSkillType(type)));
-        m_table->setItem(row, 2, new QTableWidgetItem(hostList.join(", ")));
+        auto* hostsItem = new QTableWidgetItem(hostList.join(", "));
+        hostsItem->setToolTip(hostList.join(", "));
+        m_table->setItem(row, 2, hostsItem);
         auto* cnt = new QTableWidgetItem(QString::number(s.locations.size()));
         cnt->setTextAlignment(Qt::AlignCenter);
         m_table->setItem(row, 3, cnt);

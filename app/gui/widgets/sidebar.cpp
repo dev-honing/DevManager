@@ -150,6 +150,7 @@ SidebarItem* Sidebar::addFooterItem(const QString& id, const QString& iconName,
     connect(it, &SidebarItem::activated, this, &Sidebar::onActivated);
     m_footLay->addWidget(it);
     m_items.insert(id, it);
+    m_footerIds.insert(id);
     return it;
 }
 
@@ -170,6 +171,13 @@ void Sidebar::setCurrent(const QString& id)
     emit selected(id);
 }
 
-void Sidebar::onActivated(const QString& id) { setCurrent(id); }
+void Sidebar::onActivated(const QString& id)
+{
+    if (m_footerIds.contains(id)) {
+        emit actionSelected(id);   // one-shot, keeps current page selected
+        return;
+    }
+    setCurrent(id);
+}
 
 } // namespace dm

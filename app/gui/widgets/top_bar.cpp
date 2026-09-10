@@ -35,10 +35,10 @@ TopBar::TopBar(QWidget* parent) : QFrame(parent)
     auto* title = new QLabel("DevManager");
     title->setObjectName("appTitle");
     title->setFont(uiFont(14, QFont::Bold, /*display=*/true));
-    auto* sub = new QLabel("Dev environment dashboard");
-    sub->setObjectName("appSubtitle");
+    m_subtitle = new QLabel("Dev environment dashboard");
+    m_subtitle->setObjectName("appSubtitle");
     titleBox->addWidget(title);
-    titleBox->addWidget(sub);
+    titleBox->addWidget(m_subtitle);
 
     // --- center: search
     m_search = new QLineEdit;
@@ -65,6 +65,7 @@ TopBar::TopBar(QWidget* parent) : QFrame(parent)
     m_rescan->setObjectName("primaryBtn");
     m_rescan->setCursor(Qt::PointingHandCursor);
     m_rescan->setIcon(icons::icon("refresh", QColor("#ffffff"), 15));
+    m_rescan->setToolTip("Re-run the read-only environment scan");
     connect(m_rescan, &QPushButton::clicked, this, &TopBar::rescanRequested);
 
     lay->addWidget(logo);
@@ -91,6 +92,12 @@ void TopBar::setBusy(bool busy)
 {
     m_rescan->setEnabled(!busy);
     m_rescan->setText(busy ? "Scanning..." : "Rescan");
+}
+
+void TopBar::setCompact(bool compact)
+{
+    m_subtitle->setVisible(!compact);
+    m_search->setVisible(!compact);
 }
 
 QString TopBar::searchText() const { return m_search->text(); }

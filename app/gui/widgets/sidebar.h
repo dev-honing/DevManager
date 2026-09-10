@@ -1,6 +1,7 @@
 #pragma once
 #include <QWidget>
 #include <QHash>
+#include <QSet>
 class QLabel;
 class QVBoxLayout;
 
@@ -46,10 +47,13 @@ public:
     QString current() const { return m_current; }
 
 signals:
-    void selected(const QString& id);
+    void selected(const QString& id);          // page items
+    void actionSelected(const QString& id);    // footer / one-shot items
 
 private:
     void onActivated(const QString& id);
+
+    QSet<QString> m_footerIds;
 
     QVBoxLayout* m_lay = nullptr;
     QVBoxLayout* m_footLay = nullptr;

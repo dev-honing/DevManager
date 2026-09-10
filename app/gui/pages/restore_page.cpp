@@ -72,6 +72,7 @@ RestorePage::RestorePage(QWidget* parent) : QWidget(parent)
     lay->addWidget(m_preBackup);
 
     m_table = new QTableWidget;
+    m_table->setTextElideMode(Qt::ElideMiddle);
     m_table->setColumnCount(5);
     m_table->setHorizontalHeaderLabels(
         {"Component", "Category", "Included", "Destination", "Exists now"});
@@ -180,6 +181,7 @@ void RestorePage::render(const RestorePreview& pv)
         auto* dst = new QTableWidgetItem(t.destPath);
         dst->setFont(monoFont(9));
         dst->setForeground(QColor(Color::TextSecondary));
+        dst->setToolTip("from  " + t.sourcePath + "\nto    " + t.destPath);
         m_table->setItem(i, 3, dst);
 
         auto* ex = new QTableWidgetItem(t.existsNow ? "move aside" : "new");

@@ -79,6 +79,7 @@ SnapshotPage::SnapshotPage(QWidget* parent) : QWidget(parent)
     lay->addWidget(m_blockers);
 
     m_table = new QTableWidget;
+    m_table->setTextElideMode(Qt::ElideMiddle);
     m_table->setColumnCount(5);
     m_table->setHorizontalHeaderLabels({"Root", "Entry", "Policy", "Size", "Files"});
     m_table->verticalHeader()->setVisible(false);
@@ -145,9 +146,10 @@ void SnapshotPage::render(const SnapshotPreview& pv)
     for (int i = 0; i < pv.artifacts.size(); ++i) {
         const PlannedArtifact& a = pv.artifacts.at(i);
         m_table->setItem(i, 0, new QTableWidgetItem(a.rootId));
-        auto* entry = new QTableWidgetItem(
-            a.name + (a.isLink ? "  → " + a.linkTarget : QString()));
-        entry->setToolTip(a.reason);
+        const QString entryText =
+            a.name + (a.isLink ? "  → " + a.linkTarget : QString());
+        auto* entry = new QTableWidgetItem(entryText);
+        entry->setToolTip(entryText + "\n" + a.path + "\n(" + a.reason + ")");
         m_table->setItem(i, 1, entry);
 
         auto* badge = new TagBadge;

@@ -13,6 +13,7 @@ public:
 
     void setLastScanned(const QString& iso);
     void setBusy(bool busy);
+    void setCompact(bool compact);   // hide subtitle + search when the window is narrow
     QString searchText() const;
 
 signals:
@@ -21,6 +22,7 @@ signals:
 
 private:
     QLineEdit* m_search = nullptr;
+    QLabel* m_subtitle = nullptr;
     QLabel* m_lastScanned = nullptr;
     QPushButton* m_rescan = nullptr;
 };
