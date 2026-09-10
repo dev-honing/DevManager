@@ -4,19 +4,19 @@
 #include "core/service/service_probe.h"
 #include "gui/app_controller.h"
 
-class QTreeWidget;
-class QTableWidget;
-class QLineEdit;
-class QLabel;
 class QStackedWidget;
 
 namespace dm {
 
 class TopBar;
 class Sidebar;
+class RightPanel;
 class SummaryCard;
 class EnvironmentPage;
-class RightPanel;
+class SkillsPage;
+class PluginsPage;
+class PackagesPage;
+class EnvVarsPage;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -29,21 +29,12 @@ private slots:
     void onScanFinished(const dm::EnvironmentInventory& inv);
     void onServicesProbed(const QList<dm::ServiceState>& services);
     void onNavSelected(const QString& id);
-    void filterPackages(const QString& text);
 
 protected:
     void resizeEvent(QResizeEvent* e) override;
 
 private:
     void buildUi();
-    QWidget* buildSkillsPage();
-    QWidget* buildPluginsPage();
-    QWidget* buildPackagesPage();
-    QWidget* buildEnvVarsPage();
-    void populateSkills(const EnvironmentInventory& inv);
-    void populatePlugins(const EnvironmentInventory& inv);
-    void populatePackages(const EnvironmentInventory& inv);
-    void populateEnvVars(const EnvironmentInventory& inv);
 
     AppController m_controller;
 
@@ -59,11 +50,10 @@ private:
     SummaryCard* m_cardPackages = nullptr;
 
     EnvironmentPage* m_envPage = nullptr;
-    QTreeWidget* m_skillTree = nullptr;
-    QTreeWidget* m_pluginTree = nullptr;
-    QTableWidget* m_packageTable = nullptr;
-    QLineEdit* m_packageFilter = nullptr;
-    QTableWidget* m_envVarTable = nullptr;
+    SkillsPage* m_skillsPage = nullptr;
+    PluginsPage* m_pluginsPage = nullptr;
+    PackagesPage* m_packagesPage = nullptr;
+    EnvVarsPage* m_envVarsPage = nullptr;
 };
 
 } // namespace dm
