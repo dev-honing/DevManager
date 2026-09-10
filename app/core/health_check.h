@@ -26,7 +26,9 @@ struct HealthReport {
 
 class HealthCheck {
 public:
-    static HealthReport run();
+    // profile: when it names a config hostProfile, only that profile's tools
+    // are checked (backup roots / services are always checked).
+    static HealthReport run(const QString& profile = {});
 };
 
 } // namespace dm

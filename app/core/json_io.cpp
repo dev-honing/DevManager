@@ -1,10 +1,28 @@
 #include "json_io.h"
 
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QSaveFile>
 
 namespace dm::json {
+
+bool writeText(const QString& path, const QString& text, QString* error)
+{
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QSaveFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        if (error) *error = f.errorString();
+        return false;
+    }
+    const QByteArray data = text.toUtf8();
+    if (f.write(data) != data.size() || !f.commit()) {
+        if (error) *error = f.errorString();
+        return false;
+    }
+    return true;
+}
 
 bool write(const QString& path, const QJsonObject& obj, QString* error)
 {

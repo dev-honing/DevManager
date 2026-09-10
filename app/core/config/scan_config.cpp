@@ -62,6 +62,9 @@ ScanConfig ScanConfig::defaults()
     c.qtSearchPaths = {"C:/Qt", "~/Qt", "$QTDIR", "$QT_ROOT", "/opt/Qt"};
     c.backupRoots = {"~/.claude", "~/.codex", "~/.agents", "~/.gemini",
                      "~/.headroom", "~/.omniroute"};
+    c.hostProfiles = {
+        {"msvc-qt6", {"cmake", "git", "node"}},   // native C/C++ track (VS2026 + Qt verified manually)
+    };
     c.snapshotRootDefaults = {{".claude", "exclude"},
                               {".codex", "exclude"},
                               {".headroom", "exclude"},
@@ -227,6 +230,13 @@ ScanConfig ScanConfig::load()
         c.qtSearchPaths = jsonStrings(root.value("qtSearchPaths"));
     if (root.contains("backupRoots"))
         c.backupRoots = jsonStrings(root.value("backupRoots"));
+
+    if (root.contains("hostProfiles")) {
+        c.hostProfiles.clear();
+        const QJsonObject hp = root.value("hostProfiles").toObject();
+        for (auto it = hp.constBegin(); it != hp.constEnd(); ++it)
+            c.hostProfiles.insert(it.key(), jsonStrings(it.value().toObject().value("tools")));
+    }
 
     if (root.contains("snapshot")) {
         const QJsonObject sn = root.value("snapshot").toObject();

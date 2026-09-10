@@ -124,6 +124,46 @@ generated, move the covered entries into that revision and clear them here.
   task-deployment control is a config choice, not a code gap), §14 주의사항
   (Headroom persistent-task caveat).
 
+### 7. P11 — Docker track (images + per-project containers + devcontainer + host profiles)
+- Commits: `434c40b` (P11.1), `5eac40c` (P11.2/11.3), `11319d5` (P11.4),
+  merge `<fill on merge>` (branch `feat/docker-track`)
+- **P11.1 layered images** — `docker/base|cpp|nextjs/Dockerfile`:
+  `ai-dev-base:0.1` (`node:22-slim` + Claude Code + Codex + git + ripgrep +
+  tini, unprivileged `node` user, `/workspace`); `ai-dev-cpp:0.1` (+ gcc/cmake/
+  gdb/ninja); `ai-dev-next:0.1` (+ corepack). `docker/build.{sh,bat}`,
+  `docker/README.md`. All three build; tools verified inside each.
+- **P11.2/11.3 per-project setup** — `app/core/project/project_env.{h,cpp}`:
+  `ProjectEnv::resolve(name, type)` against `config/project-types.json`;
+  `composeYaml()` (project bind-mount `..:/workspace` + named volumes
+  `claude`/`codex`/`deps`, `host.docker.internal` wired); `devcontainerJson()`.
+  `json::writeText` added. CLI: `devmanager-scan --project-init <name>
+  --project-type <t>` writes `.devmanager/docker-compose.yml` +
+  `.devcontainer/devcontainer.json`; `--project-up` / `--project-down` run
+  `docker compose`. Verified end to end: init → up (network + 3 volumes +
+  container) → `exec cc main.c` inside `ai-dev-cpp` → down.
+- **P11.4 host profiles** — `ScanConfig.hostProfiles` (name → PATH-checkable
+  tool ids); `HealthCheck::run(profile)` restricts the tool section to that
+  list. `devmanager-scan --health --profile msvc-qt6`. `docs/host-profiles.md`.
+  `project-types.json` `windows-cpp` → `hostProfile msvc-qt6` (docker:false).
+- Tests: `tst_project_env` (3) new; `tst_health_check` +1 (profile filter);
+  `tst_service_lifecycle` unchanged. **13 suites total.**
+- **Docx sections to touch:** this is the big one — §11 (was "P11 보류 / 완전
+  미착수") flips to **done**. Add:
+  - §2.1 module table: `project/project_env`
+  - §2.3 CLI: `--service`/`--service-op` (from #6), `--project-init/-up/-down`,
+    `--health --profile`
+  - §3 config: `hostProfiles`, and `tools[].install` (from #5)
+  - new §: "Container track" — the three images, per-project compose + volumes,
+    devcontainer, `host.docker.internal` + `HEADROOM_HOST=0.0.0.0` note
+  - §9 배포 / §host-profiles: native `msvc-qt6` profile (DevManager itself is
+    the reference impl)
+  - §12.1 roadmap: **P11 → done** (images, per-project containers, devcontainer,
+    hostProfile all built + verified). §12.2: P11 row removed from 잔여.
+  - §13 v2 대비 미착수: the Docker/Project-Creator/Volume/VS-Code/hostProfile
+    rows all move from "미착수" to "done (P11)".
+  - §16 summary: DevManager now covers both the migration track AND the
+    container-isolation track.
+
 ---
 
 ## How to use this file

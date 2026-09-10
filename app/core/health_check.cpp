@@ -20,14 +20,18 @@ void add(HealthReport& r, const QString& group, const QString& name,
 }
 } // namespace
 
-HealthReport HealthCheck::run()
+HealthReport HealthCheck::run(const QString& profile)
 {
     HealthReport r;
     const ScanConfig cfg = ScanConfig::load();
     const EnvironmentInventory inv = EnvironmentScanner::scan();
 
+    const QStringList only = cfg.hostProfiles.value(profile);   // empty => all tools
+
     // configured tools must resolve to an executable
     for (const ToolSpec& t : cfg.tools) {
+        if (!only.isEmpty() && !only.contains(t.id))
+            continue;
         const QString path = inv.toolPaths.value(t.id);
         const QString ver = inv.tools.value(t.id);
         if (path.isEmpty())

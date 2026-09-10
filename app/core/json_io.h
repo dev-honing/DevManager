@@ -8,6 +8,9 @@ namespace dm::json {
 // which broke non-Qt parsers). Returns false and sets *error on failure.
 bool write(const QString& path, const QJsonObject& obj, QString* error = nullptr);
 
+// Write arbitrary text as UTF-8 without a BOM (creates parent dirs).
+bool writeText(const QString& path, const QString& text, QString* error = nullptr);
+
 // Reads an object; tolerates a leading UTF-8 BOM. Returns {} on failure.
 QJsonObject read(const QString& path, QString* error = nullptr);
 
