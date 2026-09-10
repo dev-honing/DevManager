@@ -166,9 +166,23 @@ RestoreResult RestoreExecutor::run(const QString& snapshotDir,
         res.restored += 1;
     }
 
-    // ---- relink -------------------------------------------------------
+    // ---- relink (scoped to the roots we just restored) ---------------
+    // Only rebuild a link whose location sits inside something this run
+    // actually restored; links elsewhere in the inventory are left alone.
     if (opts.recreateLinks) {
         tick(RestoreState::Relinking);
+        QStringList restoredRoots;
+        for (const RestoreStep& st : res.steps)
+            if (st.restored)
+                restoredRoots << QDir::fromNativeSeparators(st.destPath);
+        auto underRestored = [&](const QString& p) {
+            const QString s = QDir::fromNativeSeparators(p);
+            for (const QString& r : restoredRoots)
+                if (s.compare(r, Qt::CaseInsensitive) == 0
+                    || s.startsWith(r + "/", Qt::CaseInsensitive))
+                    return true;
+            return false;
+        };
         const QJsonObject inv =
             json::read(QDir(snapshotDir).filePath("inventory.json"));
         for (const QJsonValue& sv :
@@ -182,6 +196,11 @@ RestoreResult RestoreExecutor::run(const QString& snapshotDir,
                     continue;
                 const QString loc =
                     remap(l.value("path").toString(), sourceUP, currentUP);
+                if (!underRestored(loc)) {
+                    res.linkResults << skill + " @ " + QFileInfo(loc).path()
+                                           + ": skipped (outside restored scope)";
+                    continue;
+                }
                 const QString tgt =
                     remap(link.value("target").toString(), sourceUP, currentUP);
                 QString e;
