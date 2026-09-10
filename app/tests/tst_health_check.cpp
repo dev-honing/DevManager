@@ -15,6 +15,7 @@ private slots:
     void init();
     void cleanup();
     void flagsMissingToolAndAbsentBackupRoot();
+    void profileFiltersToItsTools();
 
 private:
     QByteArray m_savedProfile;
@@ -35,13 +36,16 @@ void TstHealthCheck::init()
 
     QJsonObject cfg{
         {"tools", QJsonArray{
-                      QJsonObject{{"id", "dm-nonexistent-tool-xyz"}, {"category", "ai"}}}},
+                      QJsonObject{{"id", "dm-nonexistent-tool-xyz"}, {"category", "ai"}},
+                      QJsonObject{{"id", "dm-other-missing-tool"}, {"category", "ai"}}}},
         {"services", QJsonArray{
                          QJsonObject{{"id", "nothing"}, {"name", "Nothing"}, {"port", 59997}}}},
         {"packageManagers", QJsonArray{}},
         {"envInclude", QJsonArray{}},
         {"qtSearchPaths", QJsonArray{}},
         {"backupRoots", QJsonArray{present, absent}},
+        {"hostProfiles", QJsonObject{
+             {"solo", QJsonObject{{"tools", QJsonArray{"dm-nonexistent-tool-xyz"}}}}}},
     };
     QDir().mkpath(m_cfgDir);
     QFile c(m_cfgDir + "/scan.json");
@@ -73,10 +77,28 @@ void TstHealthCheck::flagsMissingToolAndAbsentBackupRoot()
         if (it.group == "backup-root" && it.status == "warn") rootWarn++;
         if (it.group == "service") svcSeen++;
     }
-    QCOMPARE(toolFail, 1);
+    QCOMPARE(toolFail, 2);
     QCOMPARE(rootOk, 1);
     QCOMPARE(rootWarn, 1);
     QVERIFY(svcSeen >= 1);       // the unreachable service is reported (warn/fail)
+}
+
+void TstHealthCheck::profileFiltersToItsTools()
+{
+    const HealthReport h = HealthCheck::run("solo");   // profile lists only one tool
+    int toolItems = 0;
+    for (const auto& it : h.items)
+        if (it.group == "tool")
+            toolItems++;
+    QCOMPARE(toolItems, 1);
+    // backup roots / services are still checked
+    bool sawRoot = false, sawSvc = false;
+    for (const auto& it : h.items) {
+        if (it.group == "backup-root") sawRoot = true;
+        if (it.group == "service") sawSvc = true;
+    }
+    QVERIFY(sawRoot);
+    QVERIFY(sawSvc);
 }
 
 QTEST_MAIN(TstHealthCheck)

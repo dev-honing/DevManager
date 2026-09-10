@@ -68,6 +68,7 @@ struct ScanConfig {
     QStringList backupRoots;     // dirs a snapshot would consider (`~`-relative ok)
     QList<SnapshotRule> snapshotRules;              // per-entry policy, first match wins
     QMap<QString, QString> snapshotRootDefaults;    // rootId -> policy; "*" = catch-all
+    QMap<QString, QStringList> hostProfiles;        // profile name -> tool ids to check
     QString sourcePath;          // file it was loaded from; empty => built-in defaults
 
     static ScanConfig defaults();

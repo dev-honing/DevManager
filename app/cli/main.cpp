@@ -63,6 +63,8 @@ int main(int argc, char** argv)
                                      "dir");
     QCommandLineOption healthOpt("health", "Check configured tools / backup roots / "
                                            "services are ready (read-only).");
+    QCommandLineOption profileOpt("profile", "With --health: only check this host "
+                                             "profile's tools (e.g. msvc-qt6).", "name");
     QCommandLineOption bootstrapOpt("bootstrap", "Print install commands for the "
                                                  "configured tools that are missing "
                                                  "(does not run them).");
@@ -95,6 +97,7 @@ int main(int argc, char** argv)
     parser.addOption(unbundleOpt);
     parser.addOption(unbundleOutOpt);
     parser.addOption(healthOpt);
+    parser.addOption(profileOpt);
     parser.addOption(bootstrapOpt);
     parser.addOption(serviceOpt);
     parser.addOption(serviceOpOpt);
@@ -114,7 +117,7 @@ int main(int argc, char** argv)
 
     // ---- health mode -----------------------------------------------
     if (parser.isSet(healthOpt)) {
-        const dm::HealthReport h = dm::HealthCheck::run();
+        const dm::HealthReport h = dm::HealthCheck::run(parser.value(profileOpt));
         for (const auto& it : h.items)
             err << "  " << it.status << "  [" << it.group << "] " << it.name
                 << (it.detail.isEmpty() ? QString() : "  -- " + it.detail) << "\n";

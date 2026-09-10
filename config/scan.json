@@ -56,6 +56,11 @@
 
   "backupRoots": ["~/.claude", "~/.codex", "~/.agents", "~/.gemini", "~/.headroom", "~/.omniroute"],
 
+  "_hostProfiles": "Named native (non-container) toolchains for `--health --profile <name>` and project-types.json's docker:false types. Only tools listed here are checked. See docs/host-profiles.md.",
+  "hostProfiles": {
+    "msvc-qt6": { "tools": ["cmake", "git", "node"] }
+  },
+
   "snapshot": {
     "_comment": "How each top-level entry under a backupRoot is treated. First matching rule wins; root ''/name '' means 'any'. Policies: backup | inventory-only | regenerate | exclude. rootDefaults is the fallback per root dir ('*' = all others). Add a rule for any AI tool you put in backupRoots.",
     "rootDefaults": { ".claude": "exclude", ".codex": "exclude", ".headroom": "exclude", ".omniroute": "exclude", "*": "backup" },
