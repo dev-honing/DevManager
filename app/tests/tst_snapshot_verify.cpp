@@ -20,6 +20,7 @@ private slots:
     void cleanSnapshotVerifiesOk();
     void tamperedFileIsAMismatch();
     void deletedComponentIsMissing();
+    void verifiesOkWhenGivenARelativePath();
 
 private:
     QByteArray m_savedProfile;
@@ -120,6 +121,28 @@ void TstSnapshotVerify::deletedComponentIsMissing()
         if (c.status == "missing")
             sawMissing = true;
     QVERIFY(sawMissing);
+}
+
+void TstSnapshotVerify::verifiesOkWhenGivenARelativePath()
+{
+    const QString dir = buildSnapshot();
+    QVERIFY(!dir.isEmpty());
+
+    // regression: a relative snapshot dir must verify the same as an absolute
+    // one -- sha256Of used to return empty for relative directory paths, so
+    // every multi-file component came back "mismatch".
+    const QString saved = QDir::currentPath();
+    QVERIFY(QDir::setCurrent(QFileInfo(dir).absolutePath()));
+    const VerifyResult v = SnapshotVerify::check(QFileInfo(dir).fileName());
+    QVERIFY(QDir::setCurrent(saved));
+
+    QVERIFY2(v.ok, "relative-path verify must succeed");
+    QCOMPARE(v.badCount, 0);
+    bool sawSkillsOk = false;
+    for (const auto& c : v.components)
+        if (c.name.contains("skills") && c.status == "ok")
+            sawSkillsOk = true;
+    QVERIFY2(sawSkillsOk, "the .claude/skills dir component must verify ok");
 }
 
 QTEST_MAIN(TstSnapshotVerify)

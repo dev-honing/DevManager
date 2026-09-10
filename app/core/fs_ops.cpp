@@ -29,9 +29,12 @@ QByteArray sha256Of(const QString& path)
     if (!fi.isDir())
         return {};
 
-    const QDir base(path);
+    // work from the absolute path: a relative `path` makes QDir::relativeFilePath
+    // / QDir::filePath round-trips below produce unopenable paths.
+    const QString root = fi.absoluteFilePath();
+    const QDir base(root);
     QStringList rels;
-    QDirIterator it(path, QDir::Files | QDir::Hidden | QDir::System,
+    QDirIterator it(root, QDir::Files | QDir::Hidden | QDir::System,
                     QDirIterator::Subdirectories);
     while (it.hasNext()) {
         it.next();
