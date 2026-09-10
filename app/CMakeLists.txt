@@ -22,6 +22,7 @@ add_library(devmanager_core STATIC
     core/scan/env_scanner.cpp
     core/service/service_probe.cpp
     core/service/service_lifecycle.cpp
+    core/project/project_env.cpp
     core/snapshot/snapshot_index.cpp
     core/snapshot/snapshot_preview.cpp
     core/snapshot/restore_preview.cpp
@@ -116,6 +117,10 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_bootstrap tests/tst_bootstrap.cpp)
     target_link_libraries(tst_bootstrap PRIVATE devmanager_core Qt6::Test)
     add_test(NAME bootstrap COMMAND tst_bootstrap)
+
+    add_executable(tst_project_env tests/tst_project_env.cpp)
+    target_link_libraries(tst_project_env PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME project_env COMMAND tst_project_env)
 endif()
 
 # ---- install: a self-contained folder (see deploy.bat) ----

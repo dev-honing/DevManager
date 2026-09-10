@@ -8,6 +8,8 @@
 #include "bootstrap.h"
 #include "health_check.h"
 #include "json_io.h"
+#include "process_runner.h"
+#include "project/project_env.h"
 #include "scan/env_scanner.h"
 #include "service/service_lifecycle.h"
 #include "service/service_probe.h"
@@ -68,6 +70,12 @@ int main(int argc, char** argv)
                                   "id");
     QCommandLineOption serviceOpOpt("service-op", "status | stop | start | restart.",
                                     "op", "status");
+    QCommandLineOption projInitOpt("project-init", "Generate .devmanager/docker-compose.yml "
+                                                   "+ .devcontainer/ for a project.", "name");
+    QCommandLineOption projTypeOpt("project-type", "cpp | nextjs | ... (project-types.json).",
+                                   "type", "cpp");
+    QCommandLineOption projUpOpt("project-up", "docker compose up -d for the generated project.");
+    QCommandLineOption projDownOpt("project-down", "docker compose down for it.");
     QCommandLineOption pruneOpt("prune", "Show which snapshots retention would drop "
                                          "(add --apply to delete them).");
     QCommandLineOption keepLastOpt("keep-last", "prune: keep the N newest snapshots.",
@@ -90,6 +98,10 @@ int main(int argc, char** argv)
     parser.addOption(bootstrapOpt);
     parser.addOption(serviceOpt);
     parser.addOption(serviceOpOpt);
+    parser.addOption(projInitOpt);
+    parser.addOption(projTypeOpt);
+    parser.addOption(projUpOpt);
+    parser.addOption(projDownOpt);
     parser.addOption(pruneOpt);
     parser.addOption(keepLastOpt);
     parser.addOption(keepDaysOpt);
@@ -130,6 +142,48 @@ int main(int argc, char** argv)
         if (!r.error.isEmpty())
             err << "  err: " << r.error << "\n";
         return r.ok ? 0 : 2;
+    }
+
+    // ---- project container setup (P11.2/11.3) ------------------------
+    if (parser.isSet(projInitOpt) || parser.isSet(projUpOpt) || parser.isSet(projDownOpt)) {
+        const QString cwd = QDir::currentPath();
+        const QString composePath = cwd + "/.devmanager/docker-compose.yml";
+
+        if (parser.isSet(projInitOpt)) {
+            const dm::ProjectSpec s = dm::ProjectEnv::resolve(
+                parser.value(projInitOpt), parser.value(projTypeOpt));
+            if (!s.valid) {
+                err << "error: " << s.error << "\n";
+                return 1;
+            }
+            if (!s.docker) {
+                err << s.name << ": host profile '" << s.hostProfile
+                    << "' -- no container, use --health --profile " << s.hostProfile << "\n";
+                return 0;
+            }
+            QString e;
+            if (!dm::json::writeText(composePath, dm::ProjectEnv::composeYaml(s), &e)
+                || !dm::json::writeText(cwd + "/.devcontainer/devcontainer.json",
+                                        dm::ProjectEnv::devcontainerJson(s), &e)) {
+                err << "error: " << e << "\n";
+                return 1;
+            }
+            err << "wrote .devmanager/docker-compose.yml + .devcontainer/devcontainer.json\n"
+                << "  image " << s.image << ", volumes " << s.volumes.join(", ") << "\n"
+                << "next:  devmanager-scan --project-up\n";
+            return 0;
+        }
+
+        if (!QFileInfo::exists(composePath)) {
+            err << "error: no .devmanager/docker-compose.yml -- run --project-init first\n";
+            return 1;
+        }
+        const QStringList args = parser.isSet(projUpOpt)
+                                     ? QStringList{"compose", "-f", composePath, "up", "-d"}
+                                     : QStringList{"compose", "-f", composePath, "down"};
+        const dm::ProcessResult r = dm::ProcessRunner::run("docker", args, 120000);
+        err << QString::fromLocal8Bit(r.out) << QString::fromLocal8Bit(r.err);
+        return r.ok() ? 0 : 2;
     }
 
     // ---- bootstrap: print install commands for missing tools ----------
