@@ -1,6 +1,7 @@
 # --- secrets / machine state: NEVER commit ---
 backups/
 inventory.json
+inventory.cpp.json
 config/versions.json
 config/*.local.json
 *.token
