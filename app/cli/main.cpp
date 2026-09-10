@@ -10,6 +10,7 @@
 #include "service/service_probe.h"
 #include "snapshot/restore_executor.h"
 #include "snapshot/restore_preview.h"
+#include "snapshot/snapshot_bundle.h"
 #include "snapshot/snapshot_diff.h"
 #include "snapshot/snapshot_executor.h"
 #include "snapshot/snapshot_index.h"
@@ -47,6 +48,13 @@ int main(int argc, char** argv)
                                  "snapshot-dir");
     QCommandLineOption diffOpt("diff", "Compare this snapshot dir (A)...", "dir-a");
     QCommandLineOption diffToOpt("diff-to", "...against this one (B).", "dir-b");
+    QCommandLineOption bundleOpt("bundle", "Pack a snapshot dir into one archive.",
+                                 "snapshot-dir");
+    QCommandLineOption bundleOutOpt("bundle-out", "Archive path (default: <dir>.tar.gz).",
+                                    "file");
+    QCommandLineOption unbundleOpt("unbundle", "Extract a snapshot archive.", "file");
+    QCommandLineOption unbundleOutOpt("unbundle-out", "Where to extract (default: cwd).",
+                                     "dir");
     parser.addOption(outOpt);
     parser.addOption(rootOpt);
     parser.addOption(snapOpt);
@@ -55,6 +63,10 @@ int main(int argc, char** argv)
     parser.addOption(verifyOpt);
     parser.addOption(diffOpt);
     parser.addOption(diffToOpt);
+    parser.addOption(bundleOpt);
+    parser.addOption(bundleOutOpt);
+    parser.addOption(unbundleOpt);
+    parser.addOption(unbundleOutOpt);
     parser.process(app);
 
     if (parser.isSet(rootOpt))
@@ -95,6 +107,32 @@ int main(int argc, char** argv)
                 << (x.note.isEmpty() ? QString() : "  (" + x.note + ")") << "\n";
         err << d.added << " added, " << d.removed << " removed, " << d.changed
             << " changed\n";
+        return 0;
+    }
+
+    // ---- bundle / unbundle -------------------------------------------
+    if (parser.isSet(bundleOpt)) {
+        const dm::BundleResult b = dm::SnapshotBundle::pack(
+            parser.value(bundleOpt), parser.value(bundleOutOpt));
+        if (!b.ok) {
+            err << "error: " << b.error << "\n";
+            return 1;
+        }
+        err << "bundled -> " << b.path << "  (" << (b.bytes / 1024) << " KB)\n";
+        return 0;
+    }
+    if (parser.isSet(unbundleOpt)) {
+        const QString dir = parser.isSet(unbundleOutOpt)
+                                ? parser.value(unbundleOutOpt)
+                                : QDir::currentPath();
+        const dm::BundleResult b =
+            dm::SnapshotBundle::unpack(parser.value(unbundleOpt), dir);
+        if (!b.ok) {
+            err << "error: " << b.error << "\n";
+            return 1;
+        }
+        err << "extracted -> " << b.path << "\n"
+            << "restore with:  devmanager-scan --restore \"" << b.path << "\"\n";
         return 0;
     }
 

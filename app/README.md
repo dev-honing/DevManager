@@ -60,6 +60,20 @@ Builds Release, then `cmake --install` stages `..\dist\DevManager\`:
 directly — no Qt install required. (If `windeployqt` isn't on `PATH` the
 install still succeeds but warns; add `C:/Qt/6.10.3/msvc2022_64/bin`.)
 
+## Migrate a snapshot to another PC
+
+```
+devmanager-scan --bundle backups\<stamp> --bundle-out env.tar.gz
+:: copy env.tar.gz to the new PC, then
+devmanager-scan --unbundle env.tar.gz --unbundle-out .\incoming
+devmanager-scan --restore .\incoming\<stamp>            :: dry run
+devmanager-scan --restore .\incoming\<stamp> --apply    :: apply
+```
+
+The bundle is a plain gzip tar of the snapshot dir (system `tar`). Snapshots
+never contain credential files, so the bundle carries no secrets — re-login
+to each tool on the new PC after restoring.
+
 ## Regression check vs the PowerShell reference
 
 ```
