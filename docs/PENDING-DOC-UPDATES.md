@@ -58,6 +58,22 @@ generated, move the covered entries into that revision and clear them here.
   alongside the earlier `~/.agents` one), §12.1 roadmap (P5 → done for the 4
   scoped roots; `.headroom/.omniroute` still open as P5-잔여), §12.2, §16 다음 단계.
 
+### 4. P10 잔여 — Snapshot retention (`SnapshotRetention`)
+- Commit: `02487f0` (branch `feat/snapshot-retention`)
+- `app/core/snapshot/snapshot_retention.{h,cpp}` — `plan()` (read-only) lists
+  snapshots under `backups/` that fall outside "keep the N newest" and/or "keep
+  newer than D days"; always keeps at least the newest; ignores
+  `pre-restore-*` / `*relink*`. `apply()` is the only destructive call
+  (`fs::removeTree` each planned dir).
+- CLI: `devmanager-scan --prune --keep-last N --keep-days D` (dry run; add
+  `--apply` to delete).
+- Dry-run on this box: 12 dirs → index sees 9 → `--keep-last 5` would prune 4
+  old snapshots (~22 GB). Not applied (destructive; user runs `--apply`).
+- **Docx sections to touch:** §2.1 module table (add `snapshot_retention`),
+  §2.3 CLI (add `--prune`), §8 스냅샷 운영 (add 8.4 retention), §11 tests
+  (add `tst_snapshot_retention`, 10 suites), §12.2 roadmap (P10 잔여 → 압축
+  아카이브만 남음; 보존 정책 done).
+
 ---
 
 ## How to use this file

@@ -29,6 +29,7 @@ add_library(devmanager_core STATIC
     core/snapshot/snapshot_verify.cpp
     core/snapshot/snapshot_diff.cpp
     core/snapshot/snapshot_bundle.cpp
+    core/snapshot/snapshot_retention.cpp
     core/snapshot/restore_executor.cpp
 )
 target_include_directories(devmanager_core PUBLIC core)
@@ -106,6 +107,10 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_health_check tests/tst_health_check.cpp)
     target_link_libraries(tst_health_check PRIVATE devmanager_core Qt6::Test)
     add_test(NAME health_check COMMAND tst_health_check)
+
+    add_executable(tst_snapshot_retention tests/tst_snapshot_retention.cpp)
+    target_link_libraries(tst_snapshot_retention PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME snapshot_retention COMMAND tst_snapshot_retention)
 endif()
 
 # ---- install: a self-contained folder (see deploy.bat) ----

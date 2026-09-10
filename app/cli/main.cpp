@@ -16,6 +16,7 @@
 #include "snapshot/snapshot_executor.h"
 #include "snapshot/snapshot_index.h"
 #include "snapshot/snapshot_preview.h"
+#include "snapshot/snapshot_retention.h"
 #include "snapshot/snapshot_verify.h"
 
 #include <QCoreApplication>
@@ -58,6 +59,12 @@ int main(int argc, char** argv)
                                      "dir");
     QCommandLineOption healthOpt("health", "Check configured tools / backup roots / "
                                            "services are ready (read-only).");
+    QCommandLineOption pruneOpt("prune", "Show which snapshots retention would drop "
+                                         "(add --apply to delete them).");
+    QCommandLineOption keepLastOpt("keep-last", "prune: keep the N newest snapshots.",
+                                   "N", "0");
+    QCommandLineOption keepDaysOpt("keep-days", "prune: keep snapshots newer than D days.",
+                                   "D", "0");
     parser.addOption(outOpt);
     parser.addOption(rootOpt);
     parser.addOption(snapOpt);
@@ -71,6 +78,9 @@ int main(int argc, char** argv)
     parser.addOption(unbundleOpt);
     parser.addOption(unbundleOutOpt);
     parser.addOption(healthOpt);
+    parser.addOption(pruneOpt);
+    parser.addOption(keepLastOpt);
+    parser.addOption(keepDaysOpt);
     parser.process(app);
 
     if (parser.isSet(rootOpt))
@@ -87,6 +97,41 @@ int main(int argc, char** argv)
         err << (h.ok ? "READY " : "NOT READY ") << h.okCount << " ok, "
             << h.warnCount << " warn, " << h.failCount << " fail\n";
         return h.ok ? 0 : 2;
+    }
+
+    // ---- prune (retention) ---------------------------------------------
+    if (parser.isSet(pruneOpt)) {
+        dm::RetentionPolicy pol;
+        pol.keepLast = parser.value(keepLastOpt).toInt();
+        pol.keepDays = parser.value(keepDaysOpt).toInt();
+        if (pol.keepLast <= 0 && pol.keepDays <= 0) {
+            err << "error: --prune needs --keep-last N and/or --keep-days D\n";
+            return 1;
+        }
+        QString backups = dm::SnapshotIndex::findBackupsDir(QDir::currentPath());
+        if (backups.isEmpty())
+            backups = QDir(QDir::currentPath()).filePath("backups");
+
+        const dm::PrunePlan plan = dm::SnapshotRetention::plan(backups, pol);
+        for (const QString& k : plan.keep)
+            err << "  keep   " << k << "\n";
+        for (const QString& p : plan.prune)
+            err << "  PRUNE  " << QDir(p).dirName() << "\n";
+        err << plan.keep.size() << " kept, " << plan.prune.size() << " to prune ("
+            << (plan.pruneBytes / 1024) << " KB)\n";
+
+        if (!parser.isSet(applyOpt)) {
+            err << "\n(dry run - pass --apply to delete)\n";
+            return 0;
+        }
+        if (plan.prune.isEmpty())
+            return 0;
+        const dm::PruneResult r = dm::SnapshotRetention::apply(plan);
+        err << (r.ok ? "OK   " : "FAIL ") << "removed " << r.removed << " ("
+            << (r.bytes / 1024) << " KB)\n";
+        for (const QString& e : r.errors)
+            err << "  err : " << e << "\n";
+        return r.ok ? 0 : 2;
     }
 
     // ---- verify mode -------------------------------------------------
