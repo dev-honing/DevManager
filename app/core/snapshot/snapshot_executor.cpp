@@ -62,18 +62,29 @@ SnapshotResult SnapshotExecutor::run(const SnapshotPreview& preview,
         } else {
             const fs::CopyStats cs = fs::copyTree(a.path, snapDir + "/" + rel);
             c.insert("type", QFileInfo(a.path).isDir() ? "directory" : "file");
-            c.insert("copied", cs.ok);
             c.insert("sizeBytes", static_cast<double>(cs.bytes));
             c.insert("fileCount", cs.files);
             for (const QString& s : cs.skippedLinks)
                 res.linkNotes << "skipped link inside " + rel + ": "
                                      + QDir::toNativeSeparators(s);
-            if (cs.ok) {
+
+            // A locked file (common in a live snapshot) is a partial copy, not
+            // a failure. Only a component where nothing at all copied fails.
+            const bool anything = cs.files > 0;
+            if (cs.ok || anything) {
                 res.copied += 1;
                 res.bytes += cs.bytes;
+                c.insert("copied", true);
+                if (!cs.ok) {
+                    c.insert("partial", true);
+                    res.linkNotes << QString("%1: %2 file(s) locked/skipped")
+                                         .arg(rel)
+                                         .arg(cs.errors.size());
+                }
             } else {
                 res.failed += 1;
                 res.errors += cs.errors;
+                c.insert("copied", false);
                 c.insert("error", cs.errors.join("; "));
             }
         }

@@ -1,9 +1,22 @@
 #include <QApplication>
+#include <QDialogButtonBox>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTimer>
 
 #include "gui/main_window.h"
 #include "gui/theme.h"
+
+// dev: auto-accept any modal QMessageBox / dialog (for headless --shot runs)
+static void acceptModals()
+{
+    for (QWidget* w : QApplication::topLevelWidgets()) {
+        if (auto* mb = qobject_cast<QMessageBox*>(w)) {
+            if (auto* b = mb->button(QMessageBox::Yes)) b->click();
+            else if (auto* ok = mb->button(QMessageBox::Ok)) ok->click();
+        }
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -31,7 +44,8 @@ int main(int argc, char** argv)
         const int ni = args.indexOf("--shot-nav");
         const QString nav = (ni >= 0 && ni + 1 < args.size()) ? args.at(ni + 1) : QString();
         const bool dry = args.contains("--shot-dryrun");
-        QTimer::singleShot(8000, &w, [&w, path, nav, dry] {
+        const bool create = args.contains("--shot-create");  // click a "Create ..." button
+        QTimer::singleShot(8000, &w, [&w, path, nav, dry, create] {
             if (!nav.isEmpty())
                 w.selectPage(nav);
             if (dry) {
@@ -39,7 +53,20 @@ int main(int argc, char** argv)
                     if (b->isVisible() && b->isEnabled())
                         b->click();
             }
-            QTimer::singleShot(dry ? 12000 : 400, &w, [&w, path] {
+            if (create) {
+                // dry check runs async; give it a moment, then click Create and
+                // auto-accept the confirmation dialog.
+                QTimer::singleShot(6000, &w, [&w] {
+                    for (auto* b : w.findChildren<QPushButton*>())
+                        if (b->isVisible() && b->isEnabled()
+                            && b->text().contains("Create Snapshot"))
+                            b->click();
+                });
+                auto* poll = new QTimer(&w);
+                poll->start(300);
+                QObject::connect(poll, &QTimer::timeout, acceptModals);
+            }
+            QTimer::singleShot(dry ? (create ? 30000 : 12000) : 400, &w, [&w, path] {
                 w.grab().save(path);
                 qApp->quit();
             });
