@@ -75,7 +75,7 @@ generated, move the covered entries into that revision and clear them here.
   아카이브만 남음; 보존 정책 done).
 
 ### 5. P9 잔여 — New-PC bootstrap (`Bootstrap`, `--bootstrap`)
-- Commit: `<fill on merge>` (branch `feat/bootstrap`)
+- Commit: 269d9da (merge of `feat/bootstrap`)
 - New optional `ToolSpec.install` field (`tools[].install` in scan.json) — a
   shell command that installs the tool. Defaults + `config/scan.json` seeded
   with winget / npm / pip hints for the common tools.
