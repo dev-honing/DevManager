@@ -1,9 +1,9 @@
-# AI Dev Environment Manager
+# DevManager
 
-Windows Host + Docker 기반으로 Claude Code / Codex 개발환경을 여러 PC·여러 프로젝트에서
-등가 재현하기 위한 오케스트레이터.
+AI 개발환경 관리자 — Windows Host + Docker 기반으로 Claude Code / Codex 개발환경을
+여러 PC·여러 프로젝트에서 등가 재현하기 위한 오케스트레이터.
 
-- 설계 문서: [`docs/AI_Dev_Environment_Design_Qt6_Docker_v2.docx`](docs/AI_Dev_Environment_Design_Qt6_Docker_v2.docx)
+- 설계 문서: [`docs/DevManager-Design-v2.docx`](docs/DevManager-Design-v2.docx)
 - 목표: byte 단위 클론이 아니라 **동일 도구 버전 + 설정으로 재현되는 등가 환경**
 
 ## 구성
