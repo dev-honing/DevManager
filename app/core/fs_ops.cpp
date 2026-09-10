@@ -2,13 +2,54 @@
 
 #include "process_runner.h"
 
+#include <QCryptographicHash>
 #include <QDir>
+#include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
 #include <QStandardPaths>
 #include <QStorageInfo>
 
 namespace dm::fs {
+
+QByteArray sha256Of(const QString& path)
+{
+    const QFileInfo fi(path);
+    if (fi.isSymLink() || fi.isJunction())
+        return {};
+
+    QCryptographicHash h(QCryptographicHash::Sha256);
+
+    if (fi.isFile()) {
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly) || !h.addData(&f))
+            return {};
+        return h.result();
+    }
+    if (!fi.isDir())
+        return {};
+
+    const QDir base(path);
+    QStringList rels;
+    QDirIterator it(path, QDir::Files | QDir::Hidden | QDir::System,
+                    QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        it.next();
+        if (it.fileInfo().isSymLink() || it.fileInfo().isJunction())
+            continue;   // don't hash through a reparse point
+        rels << base.relativeFilePath(it.filePath());
+    }
+    rels.sort();
+
+    for (const QString& rel : rels) {
+        h.addData(rel.toUtf8());
+        h.addData(QByteArray(1, '\0'));
+        QFile f(base.filePath(rel));
+        if (!f.open(QIODevice::ReadOnly) || !h.addData(&f))
+            return {};
+    }
+    return h.result();
+}
 
 CopyStats copyTree(const QString& src, const QString& dst)
 {

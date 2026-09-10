@@ -75,6 +75,9 @@ SnapshotResult SnapshotExecutor::run(const SnapshotPreview& preview,
                 res.copied += 1;
                 res.bytes += cs.bytes;
                 c.insert("copied", true);
+                const QByteArray dg = fs::sha256Of(snapDir + "/" + rel);
+                if (!dg.isEmpty())
+                    c.insert("sha256", QString::fromLatin1(dg.toHex()));
                 if (!cs.ok) {
                     c.insert("partial", true);
                     res.linkNotes << QString("%1: %2 file(s) locked/skipped")
