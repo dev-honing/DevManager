@@ -97,3 +97,23 @@ if(DEVMANAGER_BUILD_TESTS)
     target_link_libraries(tst_snapshot_diff PRIVATE devmanager_core Qt6::Test)
     add_test(NAME snapshot_diff COMMAND tst_snapshot_diff)
 endif()
+
+# ---- install: a self-contained folder (see deploy.bat) ----
+install(TARGETS devmanager-gui devmanager-scan RUNTIME DESTINATION .)
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../config/" DESTINATION config
+        FILES_MATCHING PATTERN "*.json")
+
+if(WIN32)
+    get_target_property(_qmake Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(_qt_bin "${_qmake}" DIRECTORY)
+    find_program(WINDEPLOYQT NAMES windeployqt HINTS "${_qt_bin}")
+    if(WINDEPLOYQT)
+        # bundle the Qt runtime next to the GUI exe at install time
+        install(CODE "execute_process(COMMAND \"${WINDEPLOYQT}\"
+            --no-translations --no-compiler-runtime --no-system-d3d-compiler
+            \"\${CMAKE_INSTALL_PREFIX}/devmanager-gui.exe\")")
+    else()
+        install(CODE "message(WARNING
+            \"windeployqt not found - Qt DLLs not bundled; add Qt bin to PATH\")")
+    endif()
+endif()

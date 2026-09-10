@@ -16,6 +16,8 @@ auth.json
 
 # --- build output ---
 build/
+build-release/
+dist/
 out/
 Debug/
 Release/
