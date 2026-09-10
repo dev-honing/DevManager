@@ -1,21 +1,28 @@
 #include "gui/main_window.h"
 
+#include "core/snapshot/snapshot_index.h"
 #include "gui/pages/environment_page.h"
 #include "gui/pages/placeholder_page.h"
 #include "gui/theme.h"
 #include "gui/widgets/icons.h"
+#include "gui/widgets/right_panel.h"
 #include "gui/widgets/sidebar.h"
 #include "gui/widgets/summary_card.h"
 #include "gui/widgets/top_bar.h"
 
+#include <QDesktopServices>
+#include <QDir>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QResizeEvent>
 #include <QStackedWidget>
 #include <QStatusBar>
 #include <QTableWidget>
 #include <QTreeWidget>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <QWidget>
 
@@ -69,6 +76,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 
     connect(&m_controller, &AppController::scanStarted, this, &MainWindow::onScanStarted);
     connect(&m_controller, &AppController::scanFinished, this, &MainWindow::onScanFinished);
+    connect(&m_controller, &AppController::servicesProbed, this, &MainWindow::onServicesProbed);
     m_controller.scanEnvironment();
 }
 
@@ -135,12 +143,23 @@ void MainWindow::buildUi()
     rightLay->addWidget(cardRow);
     rightLay->addWidget(m_stack, 1);
 
+    m_rightPanel = new RightPanel;
+    connect(m_rightPanel, &RightPanel::scanRequested,
+            &m_controller, &AppController::scanEnvironment);
+    connect(m_rightPanel, &RightPanel::navigateTo, this,
+            [this](const QString& id) { m_sidebar->setCurrent(id); });
+    connect(m_rightPanel, &RightPanel::openDevFolderRequested, this, [this] {
+        if (!m_devRoot.isEmpty())
+            QDesktopServices::openUrl(QUrl::fromLocalFile(m_devRoot));
+    });
+
     auto* body = new QWidget;
     auto* bodyLay = new QHBoxLayout(body);
     bodyLay->setContentsMargins(0, 0, 0, 0);
     bodyLay->setSpacing(0);
     bodyLay->addWidget(m_sidebar);
     bodyLay->addWidget(rightSide, 1);
+    bodyLay->addWidget(m_rightPanel);
 
     auto* central = new QWidget;
     auto* outer = new QVBoxLayout(central);
@@ -190,6 +209,18 @@ QWidget* MainWindow::buildEnvVarsPage()
 
 void MainWindow::selectPage(const QString& id) { m_sidebar->setCurrent(id); }
 
+void MainWindow::resizeEvent(QResizeEvent* e)
+{
+    QMainWindow::resizeEvent(e);
+    if (m_rightPanel)
+        m_rightPanel->setVisible(width() >= 1160);
+}
+
+void MainWindow::onServicesProbed(const QList<ServiceState>& services)
+{
+    m_rightPanel->setServices(services);
+}
+
 void MainWindow::onNavSelected(const QString& id)
 {
     static const QHash<QString, int> map{
@@ -231,6 +262,10 @@ void MainWindow::onScanFinished(const EnvironmentInventory& inv)
     m_sidebar->setCount("skills", inv.skills.size());
     m_sidebar->setCount("plugins", inv.plugins.size());
     m_sidebar->setCount("packages", inv.globalPackages.size());
+
+    const QString backups = SnapshotIndex::findBackupsDir(inv.root);
+    m_devRoot = backups.isEmpty() ? inv.root : QFileInfo(backups).absolutePath();
+    m_rightPanel->setSnapshots(SnapshotIndex::list(backups));
 
     m_topBar->setBusy(false);
     m_topBar->setLastScanned(inv.capturedAt);

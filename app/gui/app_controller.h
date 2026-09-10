@@ -6,7 +6,9 @@
 //
 #include <QObject>
 #include <QFutureWatcher>
+#include <QList>
 
+#include "core/service/service_probe.h"
 #include "model.h"
 
 namespace dm {
@@ -19,15 +21,17 @@ public:
     bool isScanning() const { return m_watcher.isRunning(); }
 
 public slots:
-    // Runs EnvironmentScanner::scan() off the GUI thread.
-    void scanEnvironment();
+    void scanEnvironment();        // EnvironmentScanner::scan() off-thread
+    void probeServices();          // ServiceProbe::probeAll() off-thread
 
 signals:
     void scanStarted();
     void scanFinished(const dm::EnvironmentInventory& inventory);
+    void servicesProbed(const QList<dm::ServiceState>& services);
 
 private:
     QFutureWatcher<EnvironmentInventory> m_watcher;
+    QFutureWatcher<QList<ServiceState>> m_svcWatcher;
 };
 
 } // namespace dm

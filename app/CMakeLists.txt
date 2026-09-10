@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
 # Qt prebuilts (msvc2022_64) are v143 ABI. Build with -T v143 (see CMakePresets.json).
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Concurrent)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Concurrent Network)
 
 # ---- core library: pure QtCore, no Widgets, so it stays unit-testable ----
 add_library(devmanager_core STATIC
@@ -16,9 +16,11 @@ add_library(devmanager_core STATIC
     core/json_io.cpp
     core/scan/skill_scanner.cpp
     core/scan/env_scanner.cpp
+    core/service/service_probe.cpp
+    core/snapshot/snapshot_index.cpp
 )
 target_include_directories(devmanager_core PUBLIC core)
-target_link_libraries(devmanager_core PUBLIC Qt6::Core)
+target_link_libraries(devmanager_core PUBLIC Qt6::Core Qt6::Network)
 
 # ---- Phase 1 CLI: read-only environment scan -> inventory json ----
 add_executable(devmanager-scan cli/main.cpp)
@@ -37,6 +39,7 @@ add_executable(devmanager-gui WIN32
     gui/widgets/top_bar.cpp
     gui/widgets/segmented_control.cpp
     gui/widgets/machine_card.cpp
+    gui/widgets/right_panel.cpp
     gui/pages/environment_page.cpp
     gui/pages/placeholder_page.cpp
 )

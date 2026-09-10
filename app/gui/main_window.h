@@ -1,6 +1,7 @@
 #pragma once
 #include <QMainWindow>
 
+#include "core/service/service_probe.h"
 #include "gui/app_controller.h"
 
 class QTreeWidget;
@@ -15,6 +16,7 @@ class TopBar;
 class Sidebar;
 class SummaryCard;
 class EnvironmentPage;
+class RightPanel;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -25,8 +27,12 @@ public:
 private slots:
     void onScanStarted();
     void onScanFinished(const dm::EnvironmentInventory& inv);
+    void onServicesProbed(const QList<dm::ServiceState>& services);
     void onNavSelected(const QString& id);
     void filterPackages(const QString& text);
+
+protected:
+    void resizeEvent(QResizeEvent* e) override;
 
 private:
     void buildUi();
@@ -43,7 +49,9 @@ private:
 
     TopBar* m_topBar = nullptr;
     Sidebar* m_sidebar = nullptr;
+    RightPanel* m_rightPanel = nullptr;
     QStackedWidget* m_stack = nullptr;
+    QString m_devRoot;
 
     SummaryCard* m_cardTools = nullptr;
     SummaryCard* m_cardSkills = nullptr;
