@@ -51,6 +51,8 @@ ScanConfig ScanConfig::defaults()
     c.envSecret = {"KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD",
                    "CREDENTIAL", "AUTH", "PRIVATE"};
     c.qtSearchPaths = {"C:/Qt", "~/Qt", "$QTDIR", "$QT_ROOT", "/opt/Qt"};
+    c.backupRoots = {"~/.claude", "~/.codex", "~/.agents", "~/.gemini",
+                     "~/.headroom", "~/.omniroute"};
     return c;
 }
 
@@ -157,6 +159,8 @@ ScanConfig ScanConfig::load()
         c.envSecret = jsonStrings(root.value("envSecret"));
     if (root.contains("qtSearchPaths"))
         c.qtSearchPaths = jsonStrings(root.value("qtSearchPaths"));
+    if (root.contains("backupRoots"))
+        c.backupRoots = jsonStrings(root.value("backupRoots"));
 
     return c;
 }

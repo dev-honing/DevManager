@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QPushButton>
 #include <QTimer>
 
 #include "gui/main_window.h"
@@ -22,10 +23,20 @@ int main(int argc, char** argv)
         const QString path = args.at(si + 1);
         const int ni = args.indexOf("--shot-nav");
         const QString nav = (ni >= 0 && ni + 1 < args.size()) ? args.at(ni + 1) : QString();
-        QTimer::singleShot(8000, &w, [&w, path, nav] {
+        const bool dry = args.contains("--shot-dryrun");
+        QTimer::singleShot(8000, &w, [&w, path, nav, dry] {
             if (!nav.isEmpty())
                 w.selectPage(nav);
-            QTimer::singleShot(400, &w, [&w, path] {
+            if (dry) {
+                bool clicked = false;
+                for (auto* b : w.findChildren<QPushButton*>("dryCheckBtn"))
+                    if (b->isVisible() && b->isEnabled()) {
+                        b->click();
+                        clicked = true;
+                    }
+                fprintf(stderr, "shot-dryrun: clicked=%d\n", clicked);
+            }
+            QTimer::singleShot(dry ? 12000 : 400, &w, [&w, path] {
                 w.grab().save(path);
                 qApp->quit();
             });

@@ -17,6 +17,8 @@ class SkillsPage;
 class PluginsPage;
 class PackagesPage;
 class EnvVarsPage;
+class SnapshotPage;
+class RestorePage;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -54,6 +56,12 @@ private:
     PluginsPage* m_pluginsPage = nullptr;
     PackagesPage* m_packagesPage = nullptr;
     EnvVarsPage* m_envVarsPage = nullptr;
+    SnapshotPage* m_snapshotPage = nullptr;
+    RestorePage* m_restorePage = nullptr;
+
+    QString m_backupsDir;
+    QList<dm::ServiceState> m_lastServices;
+    void refreshMigrationPages();
 };
 
 } // namespace dm

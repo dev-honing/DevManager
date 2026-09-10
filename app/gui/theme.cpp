@@ -64,12 +64,12 @@ QToolTip { background: %(panel); color: %(text); border: 1px solid %(border);
 #topSearch:focus { border: 1px solid %(primary); }
 #lastScanned { color: %(muted); font-size: 12px; }
 
-QPushButton#primaryBtn {
+QPushButton#primaryBtn, QPushButton#dryCheckBtn {
     background: %(primary); color: #ffffff; border: none;
     border-radius: 7px; padding: 8px 16px; font-weight: 600;
 }
-QPushButton#primaryBtn:hover { background: %(primaryHover); }
-QPushButton#primaryBtn:disabled { background: %(border); color: %(muted); }
+QPushButton#primaryBtn:hover, QPushButton#dryCheckBtn:hover { background: %(primaryHover); }
+QPushButton#primaryBtn:disabled, QPushButton#dryCheckBtn:disabled { background: %(border); color: %(muted); }
 
 QPushButton#secondaryBtn {
     background: %(panel); color: %(text); border: 1px solid %(border);

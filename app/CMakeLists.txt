@@ -19,6 +19,8 @@ add_library(devmanager_core STATIC
     core/scan/env_scanner.cpp
     core/service/service_probe.cpp
     core/snapshot/snapshot_index.cpp
+    core/snapshot/snapshot_preview.cpp
+    core/snapshot/restore_preview.cpp
 )
 target_include_directories(devmanager_core PUBLIC core)
 target_link_libraries(devmanager_core PUBLIC Qt6::Core Qt6::Network)
@@ -48,6 +50,8 @@ add_executable(devmanager-gui WIN32
     gui/pages/plugins_page.cpp
     gui/pages/packages_page.cpp
     gui/pages/env_vars_page.cpp
+    gui/pages/snapshot_page.cpp
+    gui/pages/restore_page.cpp
 )
 target_include_directories(devmanager-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(devmanager-gui PRIVATE

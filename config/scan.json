@@ -42,5 +42,7 @@
     "KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "AUTH", "PRIVATE"
   ],
 
-  "qtSearchPaths": ["C:/Qt", "~/Qt", "$QTDIR", "$QT_ROOT", "/opt/Qt"]
+  "qtSearchPaths": ["C:/Qt", "~/Qt", "$QTDIR", "$QT_ROOT", "/opt/Qt"],
+
+  "backupRoots": ["~/.claude", "~/.codex", "~/.agents", "~/.gemini", "~/.headroom", "~/.omniroute"]
 }

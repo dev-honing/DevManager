@@ -40,6 +40,7 @@ struct ScanConfig {
     QStringList envInclude;      // name substrings (case-insensitive) to surface
     QStringList envSecret;       // name substrings that force value masking
     QStringList qtSearchPaths;   // dirs scanned for `\d+\.\d+` version subfolders
+    QStringList backupRoots;     // dirs a snapshot would consider (`~`-relative ok)
     QString sourcePath;          // file it was loaded from; empty => built-in defaults
 
     static ScanConfig defaults();

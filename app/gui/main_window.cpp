@@ -6,7 +6,9 @@
 #include "gui/pages/packages_page.h"
 #include "gui/pages/placeholder_page.h"
 #include "gui/pages/plugins_page.h"
+#include "gui/pages/restore_page.h"
 #include "gui/pages/skills_page.h"
+#include "gui/pages/snapshot_page.h"
 #include "gui/theme.h"
 #include "gui/widgets/right_panel.h"
 #include "gui/widgets/sidebar.h"
@@ -85,10 +87,10 @@ void MainWindow::buildUi()
     m_stack->addWidget(m_pluginsPage);    // 2
     m_stack->addWidget(m_packagesPage);   // 3
     m_stack->addWidget(m_envVarsPage);    // 4
-    m_stack->addWidget(new PlaceholderPage(
-        "snapshots", "Snapshots", "Snapshot planning arrives in a later phase."));  // 5
-    m_stack->addWidget(new PlaceholderPage(
-        "restore", "Restore", "Restore (dry-run first) arrives in a later phase.")); // 6
+    m_snapshotPage = new SnapshotPage;
+    m_restorePage = new RestorePage;
+    m_stack->addWidget(m_snapshotPage);   // 5
+    m_stack->addWidget(m_restorePage);    // 6
     m_stack->addWidget(new PlaceholderPage(
         "settings", "Settings", "Nothing to configure yet."));                       // 7
 
@@ -140,7 +142,15 @@ void MainWindow::resizeEvent(QResizeEvent* e)
 
 void MainWindow::onServicesProbed(const QList<ServiceState>& services)
 {
+    m_lastServices = services;
     m_rightPanel->setServices(services);
+    refreshMigrationPages();
+}
+
+void MainWindow::refreshMigrationPages()
+{
+    m_snapshotPage->setServices(m_lastServices);
+    m_restorePage->setContext(m_backupsDir, m_lastServices);
 }
 
 void MainWindow::onNavSelected(const QString& id)
@@ -185,9 +195,11 @@ void MainWindow::onScanFinished(const EnvironmentInventory& inv)
     m_sidebar->setCount("plugins", inv.plugins.size());
     m_sidebar->setCount("packages", inv.globalPackages.size());
 
-    const QString backups = SnapshotIndex::findBackupsDir(inv.root);
-    m_devRoot = backups.isEmpty() ? inv.root : QFileInfo(backups).absolutePath();
-    m_rightPanel->setSnapshots(SnapshotIndex::list(backups));
+    m_backupsDir = SnapshotIndex::findBackupsDir(inv.root);
+    m_devRoot = m_backupsDir.isEmpty() ? inv.root
+                                       : QFileInfo(m_backupsDir).absolutePath();
+    m_rightPanel->setSnapshots(SnapshotIndex::list(m_backupsDir));
+    refreshMigrationPages();
 
     m_topBar->setBusy(false);
     m_topBar->setLastScanned(inv.capturedAt);
