@@ -2,25 +2,24 @@
 #requires -Version 5.1
 
 <#
-    DevManager Snapshot v4.0
+    DevManager Snapshot v4.1
 
     Goals:
-    - Discover the current AI development environment dynamically.
-    - Do not hardcode individual skill/plugin names.
-    - Discover skill roots and plugin roots from common config locations.
-    - Discover global npm and pip packages dynamically.
-    - Back up core AI tool configuration.
-    - Back up discovered skills/plugins that are outside core backup roots.
-    - Preserve inventory.json and manifest.json inside each snapshot.
-    - Keep service-specific health probes separate from generic discovery.
+    - Dynamically discover AI development environment components.
+    - Do not hardcode individual skill or plugin names.
+    - Discover skills, plugins and global packages.
+    - Classify user, system and linked skills.
+    - Back up core configuration and discovered external items.
+    - Keep package inventories separate from restore targets.
+    - Generate inventory.json and manifest.json.
 
     Safety:
     - Original configuration is never modified.
     - Snapshot only reads and copies existing files.
     - Backups may contain credentials and OAuth state.
     - Never commit backups/ to Git.
-    - For migration-grade snapshots, stop Headroom and OmniRoute and use
-      -RequireServicesStopped.
+    - For migration-grade snapshots, stop Headroom and OmniRoute
+      and use -RequireServicesStopped.
 #>
 
 [CmdletBinding()]
@@ -371,11 +370,13 @@ function Test-PathInside
 
     try
     {
-        $ChildFull = [System.IO.Path]::GetFullPath($ChildPath).
-            TrimEnd('\') + '\'
+        $ChildFull = (
+            [System.IO.Path]::GetFullPath($ChildPath)
+        ).TrimEnd('\') + '\'
 
-        $ParentFull = [System.IO.Path]::GetFullPath($ParentPath).
-            TrimEnd('\') + '\'
+        $ParentFull = (
+            [System.IO.Path]::GetFullPath($ParentPath)
+        ).TrimEnd('\') + '\'
 
         return $ChildFull.StartsWith(
             $ParentFull,
@@ -596,7 +597,7 @@ function Get-GitInfo
 
 
 # ============================================================
-# Dynamic root discovery
+# Dynamic discovery
 # ============================================================
 
 function Get-DiscoveryRoots
@@ -609,6 +610,7 @@ function Get-DiscoveryRoots
     $Results = @()
     $Seen = @{}
 
+
     $ExplicitCandidates = @(
         "$env:USERPROFILE\.claude\$LeafName",
         "$env:USERPROFILE\.codex\$LeafName",
@@ -618,6 +620,7 @@ function Get-DiscoveryRoots
         "$env:USERPROFILE\.config\$LeafName",
         "$env:USERPROFILE\.local\$LeafName"
     )
+
 
     foreach ($Candidate in $ExplicitCandidates)
     {
@@ -629,10 +632,11 @@ function Get-DiscoveryRoots
         try
         {
             $Full = [System.IO.Path]::GetFullPath($Candidate)
+            $Key = $Full.ToLowerInvariant()
 
-            if (-not $Seen.ContainsKey($Full.ToLowerInvariant()))
+            if (-not $Seen.ContainsKey($Key))
             {
-                $Seen[$Full.ToLowerInvariant()] = $true
+                $Seen[$Key] = $true
                 $Results += $Full
             }
         }
@@ -665,12 +669,14 @@ function Get-DiscoveryRoots
             -Force `
             -ErrorAction SilentlyContinue
 
+
         foreach ($Child in $Children)
         {
             $Candidates = @(
                 (Join-Path $Child.FullName $LeafName),
                 (Join-Path $Child.FullName "config\$LeafName")
             )
+
 
             foreach ($Candidate in $Candidates)
             {
@@ -757,6 +763,64 @@ function Get-HostFromRoot
 }
 
 
+function Test-InternalPluginDirectory
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $Lower = $Name.ToLowerInvariant()
+
+
+    if ($Lower.StartsWith('.'))
+    {
+        return $true
+    }
+
+
+    $InternalNames = @(
+        'cache',
+        'data',
+        'config',
+        'marketplaces',
+        'logs',
+        'tmp',
+        'temp',
+        'state',
+        'sessions',
+        'staging'
+    )
+
+
+    return ($InternalNames -contains $Lower)
+}
+
+
+function Get-SkillClassification
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        $LinkInfo
+    )
+
+    if ($LinkInfo.isLink)
+    {
+        return 'linked'
+    }
+
+    if ($Name.StartsWith('.'))
+    {
+        return 'system'
+    }
+
+    return 'user'
+}
+
+
 function Get-DynamicItems
 {
     param(
@@ -764,6 +828,7 @@ function Get-DynamicItems
         [string[]]$Roots,
 
         [Parameter(Mandatory = $true)]
+        [ValidateSet('skill', 'plugin')]
         [string]$ItemType
     )
 
@@ -776,6 +841,7 @@ function Get-DynamicItems
         {
             continue
         }
+
 
         $HostName = Get-HostFromRoot `
             -RootPath $RootPath
@@ -790,10 +856,21 @@ function Get-DynamicItems
 
         foreach ($Item in $Items)
         {
+            if (
+                $ItemType -eq 'plugin' -and
+                (Test-InternalPluginDirectory -Name $Item.Name)
+            )
+            {
+                continue
+            }
+
+
             $Link = Get-LinkInfo `
                 -Path $Item.FullName
 
+
             $GitProbePath = $Item.FullName
+
 
             if (
                 $Link.isLink -and
@@ -804,19 +881,24 @@ function Get-DynamicItems
                 $GitProbePath = $Link.target
             }
 
+
             $GitInfo = Get-GitInfo `
                 -Path $GitProbePath
 
 
             $HasSkillMd = $false
+            $Classification = 'user'
+
 
             if ($ItemType -eq 'skill')
             {
-                $HasSkillMd = (
-                    Test-Path (
-                        Join-Path $Item.FullName 'SKILL.md'
-                    )
+                $HasSkillMd = Test-Path (
+                    Join-Path $Item.FullName 'SKILL.md'
                 )
+
+                $Classification = Get-SkillClassification `
+                    -Name $Item.Name `
+                    -LinkInfo $Link
             }
 
 
@@ -826,6 +908,8 @@ function Get-DynamicItems
                 type = $ItemType
 
                 host = $HostName
+
+                classification = $Classification
 
                 root = $RootPath
 
@@ -849,6 +933,7 @@ function Merge-DynamicItemsByName
 {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [object[]]$Items
     )
 
@@ -872,6 +957,8 @@ function Merge-DynamicItemsByName
 
         $Groups[$Key].locations += [ordered]@{
             host = $Item.host
+
+            classification = $Item.classification
 
             root = $Item.root
 
@@ -914,6 +1001,7 @@ function Get-NpmGlobalPackages
             -Name 'npm' `
             -ErrorAction SilentlyContinue
 
+
         if ($null -eq $Npm)
         {
             return $Results
@@ -944,12 +1032,15 @@ function Get-NpmGlobalPackages
         {
             $Package = $Property.Value
 
+
             $Results += [ordered]@{
                 manager = 'npm'
 
                 name = $Property.Name
 
                 version = [string]$Package.version
+
+                restorePolicy = 'inventory-only'
             }
         }
     }
@@ -975,6 +1066,7 @@ function Get-PipGlobalPackages
         $Python = Get-Command `
             -Name 'python' `
             -ErrorAction SilentlyContinue
+
 
         if ($null -eq $Python)
         {
@@ -1004,6 +1096,8 @@ function Get-PipGlobalPackages
                 name = [string]$Package.name
 
                 version = [string]$Package.version
+
+                restorePolicy = 'inventory-only'
             }
         }
     }
@@ -1211,6 +1305,7 @@ function Get-VisualStudioVersions
     {
         $ProgramFilesX86 = ${env:ProgramFiles(x86)}
 
+
         if ([string]::IsNullOrWhiteSpace($ProgramFilesX86))
         {
             return $null
@@ -1276,11 +1371,9 @@ function Get-QtVersions
 
 function Get-OmniRouteVersion
 {
-    $Version = Get-VersionSafe `
+    return Get-VersionSafe `
         -Executable 'omniroute' `
         -Arguments @('--version')
-
-    return $Version
 }
 
 
@@ -1338,7 +1431,7 @@ function Get-OmniRouteModelSummary
 
 
 # ============================================================
-# Backup
+# Backup helpers
 # ============================================================
 
 function Copy-SnapshotItem
@@ -1371,6 +1464,7 @@ function Add-BackupTarget
 {
     param(
         [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
         [System.Collections.ArrayList]$Targets,
 
         [Parameter(Mandatory = $true)]
@@ -1401,8 +1495,9 @@ function Add-BackupTarget
 
     try
     {
-        $Key = [System.IO.Path]::GetFullPath($Source).
-            ToLowerInvariant()
+        $Key = (
+            [System.IO.Path]::GetFullPath($Source)
+        ).ToLowerInvariant()
     }
     catch
     {
@@ -1443,7 +1538,7 @@ function Add-BackupTarget
 
 Write-Host ''
 Write-Host '========================================' -ForegroundColor Cyan
-Write-Host ' DevManager Snapshot v4.0' -ForegroundColor Cyan
+Write-Host ' DevManager Snapshot v4.1' -ForegroundColor Cyan
 Write-Host '========================================' -ForegroundColor Cyan
 Write-Host ''
 
@@ -1534,6 +1629,7 @@ if ($RequireServicesStopped)
     {
         throw 'Headroom is running. Stop it and retry.'
     }
+
 
     if ($OmniRouteListening)
     {
@@ -1637,12 +1733,23 @@ foreach ($Skill in $Skills)
     )
 
 
+    $Classes = @(
+        $Skill.locations |
+        ForEach-Object {
+            $_.classification
+        } |
+        Sort-Object -Unique
+    )
+
+
     Write-Host (
         '         skill: ' +
         $Skill.name +
         ' [' +
         ($Hosts -join ', ') +
-        ']'
+        '] {' +
+        ($Classes -join ', ') +
+        '}'
     ) -ForegroundColor DarkGray
 }
 
@@ -1681,7 +1788,7 @@ Write-Host (
 
 
 # ============================================================
-# 3. Environment inventory
+# 3. Build inventory
 # ============================================================
 
 Write-Host ''
@@ -1738,7 +1845,7 @@ if ($null -ne $HeadroomHealth)
 $Inventory = [ordered]@{
     schemaVersion = 4
 
-    snapshotVersion = '4.0'
+    snapshotVersion = '4.1'
 
     capturedAt = (Get-Date).ToString('o')
 
@@ -1887,7 +1994,7 @@ Write-Host "  [OK]   $InventoryPath" -ForegroundColor Green
 
 
 # ============================================================
-# 4. Build backup plan dynamically
+# 4. Backup plan
 # ============================================================
 
 Write-Host ''
@@ -1956,10 +2063,6 @@ foreach ($Core in $CoreDirectories)
 }
 
 
-# ------------------------------------------------------------
-# Optional machine configuration
-# ------------------------------------------------------------
-
 Add-BackupTarget `
     -Targets $Targets `
     -Seen $SeenTargets `
@@ -1990,10 +2093,6 @@ Add-BackupTarget `
     -Category 'machine'
 
 
-# ------------------------------------------------------------
-# Add dynamically discovered skills not covered by core roots
-# ------------------------------------------------------------
-
 $CoreSourcePaths = @(
     $CoreDirectories |
     ForEach-Object {
@@ -2001,6 +2100,10 @@ $CoreSourcePaths = @(
     }
 )
 
+
+# ------------------------------------------------------------
+# External discovered skills
+# ------------------------------------------------------------
 
 foreach ($SkillLocation in $SkillLocations)
 {
@@ -2060,7 +2163,7 @@ foreach ($SkillLocation in $SkillLocations)
 
 
 # ------------------------------------------------------------
-# Add dynamically discovered plugins not covered by core roots
+# External discovered plugins
 # ------------------------------------------------------------
 
 foreach ($PluginLocation in $PluginLocations)
@@ -2243,10 +2346,34 @@ $ConsistentSnapshot = (
 )
 
 
+$UserSkillCount = @(
+    $SkillLocations |
+    Where-Object {
+        $_.classification -eq 'user'
+    }
+).Count
+
+
+$LinkedSkillCount = @(
+    $SkillLocations |
+    Where-Object {
+        $_.classification -eq 'linked'
+    }
+).Count
+
+
+$SystemSkillCount = @(
+    $SkillLocations |
+    Where-Object {
+        $_.classification -eq 'system'
+    }
+).Count
+
+
 $Manifest = [ordered]@{
     schemaVersion = 4
 
-    snapshotVersion = '4.0'
+    snapshotVersion = '4.1'
 
     stamp = $Stamp
 
@@ -2264,6 +2391,12 @@ $Manifest = [ordered]@{
         skillRootCount = $SkillRoots.Count
 
         skillCount = $Skills.Count
+
+        userSkillLocationCount = $UserSkillCount
+
+        linkedSkillLocationCount = $LinkedSkillCount
+
+        systemSkillLocationCount = $SystemSkillCount
 
         pluginRootCount = $PluginRoots.Count
 
@@ -2289,6 +2422,9 @@ $Manifest = [ordered]@{
         'Never commit backups/ to Git.',
         'Environment variables in inventory.json are masked and are validation data only.',
         'Do not restore masked secret values as real environment variables.',
+        'npm and pip packages are inventory-only and are not automatically restored.',
+        'System skills are discovered for inventory purposes and should not automatically be treated as user-installed skills.',
+        'Linked skills should preserve or recreate their link targets instead of blindly duplicating files.',
         'A live OmniRoute snapshot may contain changing database state.',
         'Machine-specific Docker and WSL settings require explicit migration handling.',
         'Absolute paths inside third-party configuration may require path translation on another PC.',
@@ -2354,22 +2490,37 @@ Write-Host ''
 Write-Host 'Dynamic discovery:' -ForegroundColor Cyan
 
 Write-Host (
-    '  Skills          : ' +
+    '  Skills             : ' +
     $Skills.Count
 )
 
 Write-Host (
-    '  Plugins         : ' +
+    '    user locations   : ' +
+    $UserSkillCount
+)
+
+Write-Host (
+    '    linked locations : ' +
+    $LinkedSkillCount
+)
+
+Write-Host (
+    '    system locations : ' +
+    $SystemSkillCount
+)
+
+Write-Host (
+    '  Plugins            : ' +
     $Plugins.Count
 )
 
 Write-Host (
-    '  npm packages    : ' +
+    '  npm packages       : ' +
     $NpmPackages.Count
 )
 
 Write-Host (
-    '  pip packages    : ' +
+    '  pip packages       : ' +
     $PipPackages.Count
 )
 
@@ -2407,4 +2558,8 @@ Write-Host (
 
 Write-Host (
     '  Keep backups/ private and out of Git.'
+)
+
+Write-Host (
+    '  Package inventories are discovery data and are not automatic restore instructions.'
 )
