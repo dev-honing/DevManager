@@ -1,0 +1,48 @@
+{
+  "_comment": "What DevManager looks for. Every list here is user-editable; delete this file to fall back to the built-in defaults (ScanConfig::defaults). '~' and $ENV_VARS are expanded in paths.",
+
+  "tools": [
+    { "id": "docker",       "category": "containers" },
+    { "id": "node",         "category": "runtimes" },
+    { "id": "npm",          "category": "runtimes" },
+    { "id": "python",       "category": "runtimes" },
+    { "id": "cmake",        "category": "build" },
+    { "id": "git",          "category": "build" },
+    { "id": "claude",       "category": "ai" },
+    { "id": "codex",        "category": "ai" },
+    { "id": "gemini",       "category": "ai" },
+    { "id": "cursor-agent", "category": "ai" },
+    { "id": "aider",        "category": "ai" },
+    { "id": "ollama",       "category": "ai" },
+    { "id": "headroom",     "category": "ai", "fallbackPaths": ["~/.local/bin/headroom.exe"] },
+    { "id": "omniroute",    "category": "ai" }
+  ],
+
+  "services": [
+    { "id": "headroom",  "name": "Headroom",  "port": 8787 },
+    { "id": "omniroute", "name": "OmniRoute", "port": 20128 },
+    { "id": "ollama",    "name": "Ollama",    "port": 11434 },
+    { "id": "docker",    "name": "Docker",    "cliCheck": ["docker", "version", "--format", "{{.Server.Version}}"] },
+    { "id": "wsl",       "name": "WSL",       "wslRunning": true }
+  ],
+
+  "packageManagers": [
+    { "id": "npm", "listArgs": ["ls", "-g", "--depth=0", "--json"], "parseMode": "npm-deps" },
+    { "id": "pip", "listArgs": ["-m", "pip", "list", "--format=json"], "parseMode": "pip-list" }
+  ],
+
+  "envInclude": [
+    "ANTHROPIC", "CLAUDE", "CODEX", "OMNIROUTE", "HEADROOM", "DOCKER",
+    "QT", "CMAKE", "GEMINI", "OPENAI", "OLLAMA", "CURSOR", "AIDER",
+    "GROQ", "MISTRAL", "DEEPSEEK", "XAI", "GOOGLE_API", "GEMINI_API",
+    "LLM", "AI_"
+  ],
+
+  "envSecret": [
+    "KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "AUTH", "PRIVATE"
+  ],
+
+  "qtSearchPaths": ["C:/Qt", "~/Qt", "$QTDIR", "$QT_ROOT", "/opt/Qt"],
+
+  "backupRoots": ["~/.claude", "~/.codex", "~/.agents", "~/.gemini", "~/.headroom", "~/.omniroute"]
+}

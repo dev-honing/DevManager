@@ -1,6 +1,7 @@
 # --- secrets / machine state: NEVER commit ---
 backups/
 inventory.json
+inventory.cpp.json
 config/versions.json
 config/*.local.json
 *.token
@@ -35,3 +36,6 @@ npm-debug.log*
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# gui dev screenshot
+ui-preview.png

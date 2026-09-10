@@ -1,0 +1,24 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "windows-v143",
+      "displayName": "Windows / VS2026 / MSVC v143 (Qt ABI match)",
+      "generator": "Visual Studio 18 2026",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.10.3/msvc2022_64",
+        "CMAKE_CXX_STANDARD": "17"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "windows-v143", "configurePreset": "windows-v143", "configuration": "Debug" }
+  ],
+  "testPresets": [
+    { "name": "windows-v143", "configurePreset": "windows-v143", "configuration": "Debug",
+      "output": { "outputOnFailure": true } }
+  ]
+}
