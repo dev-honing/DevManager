@@ -2,26 +2,25 @@
 #requires -Version 5.1
 
 <#
-    DevManager Snapshot v3.3
+    DevManager Snapshot v4.0
 
-    Purpose:
-    - Collect current development environment inventory.
-    - Back up Claude, Codex, Headroom and OmniRoute state.
-    - Back up Docker Desktop and WSL settings when present.
-    - Generate manifest.json for restore-current.ps1.
-    - Store a copy of inventory.json inside the snapshot directory.
+    Goals:
+    - Discover the current AI development environment dynamically.
+    - Do not hardcode individual skill/plugin names.
+    - Discover skill roots and plugin roots from common config locations.
+    - Discover global npm and pip packages dynamically.
+    - Back up core AI tool configuration.
+    - Back up discovered skills/plugins that are outside core backup roots.
+    - Preserve inventory.json and manifest.json inside each snapshot.
+    - Keep service-specific health probes separate from generic discovery.
 
     Safety:
-    - Does not modify original Claude/Codex/Headroom/OmniRoute settings.
-    - Only reads existing state and creates backup copies.
-    - inventory.json is created or replaced in the project root.
-    - backups\<timestamp>\ is created for each snapshot.
-
-    Important:
-    - Backups may contain OAuth tokens, API keys and other secrets.
-    - Never commit the backups directory to Git.
-    - OmniRoute SQLite state may not be fully consistent while OmniRoute is running.
-    - For migration-grade snapshots, use -RequireServicesStopped.
+    - Original configuration is never modified.
+    - Snapshot only reads and copies existing files.
+    - Backups may contain credentials and OAuth state.
+    - Never commit backups/ to Git.
+    - For migration-grade snapshots, stop Headroom and OmniRoute and use
+      -RequireServicesStopped.
 #>
 
 [CmdletBinding()]
@@ -34,9 +33,9 @@ param(
 $ErrorActionPreference = 'Stop'
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Root
-# ------------------------------------------------------------
+# ============================================================
 
 if ([string]::IsNullOrWhiteSpace($Root))
 {
@@ -48,9 +47,7 @@ if ([string]::IsNullOrWhiteSpace($Root))
     $Root = Split-Path -Path $PSScriptRoot -Parent
 }
 
-
 $Root = [System.IO.Path]::GetFullPath($Root)
-
 
 if (-not (Test-Path $Root))
 {
@@ -58,9 +55,9 @@ if (-not (Test-Path $Root))
 }
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Paths
-# ------------------------------------------------------------
+# ============================================================
 
 $Stamp = Get-Date -Format 'yyyy-MM-ddTHHmmss'
 
@@ -69,13 +66,12 @@ $Dest = Join-Path $BackupsRoot $Stamp
 
 $InventoryPath = Join-Path $Root 'inventory.json'
 $SnapshotInventoryPath = Join-Path $Dest 'inventory.json'
-
 $ManifestPath = Join-Path $Dest 'manifest.json'
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Helpers
-# ------------------------------------------------------------
+# ============================================================
 
 function Get-CommandPath
 {
@@ -86,13 +82,11 @@ function Get-CommandPath
         [string[]]$FallbackPaths = @()
     )
 
-
     try
     {
         $Command = Get-Command `
             -Name $Name `
             -ErrorAction SilentlyContinue
-
 
         if ($null -ne $Command)
         {
@@ -101,12 +95,10 @@ function Get-CommandPath
                 return $Command.Source
             }
 
-
             if (-not [string]::IsNullOrWhiteSpace($Command.Path))
             {
                 return $Command.Path
             }
-
 
             if (-not [string]::IsNullOrWhiteSpace($Command.Definition))
             {
@@ -118,7 +110,6 @@ function Get-CommandPath
     {
     }
 
-
     foreach ($FallbackPath in $FallbackPaths)
     {
         if ([string]::IsNullOrWhiteSpace($FallbackPath))
@@ -126,13 +117,11 @@ function Get-CommandPath
             continue
         }
 
-
         if (Test-Path $FallbackPath)
         {
             return $FallbackPath
         }
     }
-
 
     return $null
 }
@@ -146,33 +135,27 @@ function Get-VersionSafe
         [string[]]$Arguments = @()
     )
 
-
     if ([string]::IsNullOrWhiteSpace($Executable))
     {
         return $null
     }
 
-
     try
     {
         $Output = & $Executable @Arguments 2>&1
-
 
         if ($null -eq $Output)
         {
             return $null
         }
 
-
         $FirstLine = $Output |
             Select-Object -First 1
-
 
         if ($null -eq $FirstLine)
         {
             return $null
         }
-
 
         return $FirstLine.ToString().Trim()
     }
@@ -195,15 +178,12 @@ function Test-TcpPort
         [int]$TimeoutMs = 1000
     )
 
-
     $Client = $null
     $AsyncResult = $null
-
 
     try
     {
         $Client = New-Object System.Net.Sockets.TcpClient
-
 
         $AsyncResult = $Client.BeginConnect(
             $HostName,
@@ -212,21 +192,17 @@ function Test-TcpPort
             $null
         )
 
-
         $Connected = $AsyncResult.AsyncWaitHandle.WaitOne(
             $TimeoutMs,
             $false
         )
-
 
         if (-not $Connected)
         {
             return $false
         }
 
-
         $Client.EndConnect($AsyncResult)
-
 
         return [bool]$Client.Connected
     }
@@ -246,7 +222,6 @@ function Test-TcpPort
             {
             }
         }
-
 
         if ($null -ne $Client)
         {
@@ -271,7 +246,6 @@ function Get-HttpSafe
         [hashtable]$Headers = $null
     )
 
-
     try
     {
         if ($null -ne $Headers)
@@ -282,7 +256,6 @@ function Get-HttpSafe
                 -TimeoutSec 5 `
                 -ErrorAction Stop
         }
-
 
         return Invoke-RestMethod `
             -Uri $Url `
@@ -302,18 +275,15 @@ function Mask-Secret
         [string]$Value
     )
 
-
     if ([string]::IsNullOrEmpty($Value))
     {
         return $Value
     }
 
-
     if ($Value.Length -le 8)
     {
         return '***'
     }
-
 
     return (
         $Value.Substring(0, 4) +
@@ -329,12 +299,10 @@ function Test-SecretName
         [string]$Name
     )
 
-
     if ([string]::IsNullOrWhiteSpace($Name))
     {
         return $false
     }
-
 
     return (
         $Name -match
@@ -343,196 +311,717 @@ function Test-SecretName
 }
 
 
-function Get-NpmGlobal
+function Get-SafeName
 {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+
+    $Result = $Value -replace '[^a-zA-Z0-9._-]', '_'
+
+    if ([string]::IsNullOrWhiteSpace($Result))
+    {
+        return 'unknown'
+    }
+
+    return $Result
+}
+
+
+function Get-ShortHash
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+
+    $Sha = [System.Security.Cryptography.SHA256]::Create()
+
+    try
+    {
+        $Bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+        $Hash = $Sha.ComputeHash($Bytes)
+
+        $Hex = -join (
+            $Hash |
+            ForEach-Object {
+                $_.ToString('x2')
+            }
+        )
+
+        return $Hex.Substring(0, 10)
+    }
+    finally
+    {
+        $Sha.Dispose()
+    }
+}
+
+
+function Test-PathInside
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ChildPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ParentPath
+    )
+
+    try
+    {
+        $ChildFull = [System.IO.Path]::GetFullPath($ChildPath).
+            TrimEnd('\') + '\'
+
+        $ParentFull = [System.IO.Path]::GetFullPath($ParentPath).
+            TrimEnd('\') + '\'
+
+        return $ChildFull.StartsWith(
+            $ParentFull,
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    }
+    catch
+    {
+        return $false
+    }
+}
+
+
+function Get-LinkInfo
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $Result = [ordered]@{
+        isLink = $false
+        linkType = $null
+        target = $null
+    }
+
+    try
+    {
+        $Item = Get-Item `
+            -LiteralPath $Path `
+            -Force `
+            -ErrorAction Stop
+
+        if (
+            $Item.Attributes -band
+            [System.IO.FileAttributes]::ReparsePoint
+        )
+        {
+            $Result.isLink = $true
+
+            if ($Item.PSObject.Properties.Name -contains 'LinkType')
+            {
+                $Result.linkType = [string]$Item.LinkType
+            }
+
+            if ($Item.PSObject.Properties.Name -contains 'Target')
+            {
+                $Target = $Item.Target
+
+                if ($Target -is [System.Array])
+                {
+                    $Target = $Target |
+                        Select-Object -First 1
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace([string]$Target))
+                {
+                    $TargetString = [string]$Target
+
+                    if (
+                        -not [System.IO.Path]::IsPathRooted(
+                            $TargetString
+                        )
+                    )
+                    {
+                        $TargetString = Join-Path `
+                            $Item.Parent.FullName `
+                            $TargetString
+                    }
+
+                    try
+                    {
+                        $TargetString = [System.IO.Path]::GetFullPath(
+                            $TargetString
+                        )
+                    }
+                    catch
+                    {
+                    }
+
+                    $Result.target = $TargetString
+                }
+            }
+        }
+    }
+    catch
+    {
+    }
+
+    return $Result
+}
+
+
+function Get-GitInfo
+{
+    param(
+        [string]$Path
+    )
+
+    $Result = [ordered]@{
+        detected = $false
+        root = $null
+        remote = $null
+        commit = $null
+        branch = $null
+    }
+
+    if (
+        [string]::IsNullOrWhiteSpace($Path) -or
+        (-not (Test-Path $Path))
+    )
+    {
+        return $Result
+    }
+
+    $Git = Get-Command `
+        -Name 'git' `
+        -ErrorAction SilentlyContinue
+
+    if ($null -eq $Git)
+    {
+        return $Result
+    }
+
+    try
+    {
+        $GitRoot = & git `
+            -C $Path `
+            rev-parse `
+            --show-toplevel `
+            2>$null
+
+        if ($LASTEXITCODE -ne 0)
+        {
+            return $Result
+        }
+
+        $GitRoot = (
+            $GitRoot |
+            Select-Object -First 1
+        ).ToString().Trim()
+
+        if ([string]::IsNullOrWhiteSpace($GitRoot))
+        {
+            return $Result
+        }
+
+        $Result.detected = $true
+        $Result.root = $GitRoot
+
+        try
+        {
+            $Remote = & git `
+                -C $Path `
+                config `
+                --get `
+                remote.origin.url `
+                2>$null
+
+            if ($LASTEXITCODE -eq 0)
+            {
+                $Result.remote = (
+                    $Remote |
+                    Select-Object -First 1
+                ).ToString().Trim()
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            $Commit = & git `
+                -C $Path `
+                rev-parse `
+                HEAD `
+                2>$null
+
+            if ($LASTEXITCODE -eq 0)
+            {
+                $Result.commit = (
+                    $Commit |
+                    Select-Object -First 1
+                ).ToString().Trim()
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            $Branch = & git `
+                -C $Path `
+                branch `
+                --show-current `
+                2>$null
+
+            if ($LASTEXITCODE -eq 0)
+            {
+                $Result.branch = (
+                    $Branch |
+                    Select-Object -First 1
+                ).ToString().Trim()
+            }
+        }
+        catch
+        {
+        }
+    }
+    catch
+    {
+    }
+
+    return $Result
+}
+
+
+# ============================================================
+# Dynamic root discovery
+# ============================================================
+
+function Get-DiscoveryRoots
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LeafName
+    )
+
+    $Results = @()
+    $Seen = @{}
+
+    $ExplicitCandidates = @(
+        "$env:USERPROFILE\.claude\$LeafName",
+        "$env:USERPROFILE\.codex\$LeafName",
+        "$env:USERPROFILE\.agents\$LeafName",
+        "$env:USERPROFILE\.gemini\$LeafName",
+        "$env:USERPROFILE\.gemini\config\$LeafName",
+        "$env:USERPROFILE\.config\$LeafName",
+        "$env:USERPROFILE\.local\$LeafName"
+    )
+
+    foreach ($Candidate in $ExplicitCandidates)
+    {
+        if (-not (Test-Path $Candidate))
+        {
+            continue
+        }
+
+        try
+        {
+            $Full = [System.IO.Path]::GetFullPath($Candidate)
+
+            if (-not $Seen.ContainsKey($Full.ToLowerInvariant()))
+            {
+                $Seen[$Full.ToLowerInvariant()] = $true
+                $Results += $Full
+            }
+        }
+        catch
+        {
+        }
+    }
+
+
+    $ParentCandidates = @(
+        $env:USERPROFILE,
+        $env:APPDATA,
+        $env:LOCALAPPDATA
+    )
+
+
+    foreach ($Parent in $ParentCandidates)
+    {
+        if (
+            [string]::IsNullOrWhiteSpace($Parent) -or
+            (-not (Test-Path $Parent))
+        )
+        {
+            continue
+        }
+
+        $Children = Get-ChildItem `
+            -LiteralPath $Parent `
+            -Directory `
+            -Force `
+            -ErrorAction SilentlyContinue
+
+        foreach ($Child in $Children)
+        {
+            $Candidates = @(
+                (Join-Path $Child.FullName $LeafName),
+                (Join-Path $Child.FullName "config\$LeafName")
+            )
+
+            foreach ($Candidate in $Candidates)
+            {
+                if (-not (Test-Path $Candidate))
+                {
+                    continue
+                }
+
+                try
+                {
+                    $Full = [System.IO.Path]::GetFullPath($Candidate)
+                    $Key = $Full.ToLowerInvariant()
+
+                    if (-not $Seen.ContainsKey($Key))
+                    {
+                        $Seen[$Key] = $true
+                        $Results += $Full
+                    }
+                }
+                catch
+                {
+                }
+            }
+        }
+    }
+
+
+    return @(
+        $Results |
+        Sort-Object
+    )
+}
+
+
+function Get-HostFromRoot
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RootPath
+    )
+
+    $Lower = $RootPath.ToLowerInvariant()
+
+    if ($Lower -match '\\\.claude\\')
+    {
+        return 'claude'
+    }
+
+    if ($Lower -match '\\\.codex\\')
+    {
+        return 'codex'
+    }
+
+    if ($Lower -match '\\\.agents\\')
+    {
+        return 'agents'
+    }
+
+    if ($Lower -match '\\\.gemini\\')
+    {
+        return 'gemini'
+    }
+
+    try
+    {
+        $Parent = Split-Path `
+            -Path $RootPath `
+            -Parent
+
+        $ParentItem = Get-Item `
+            -LiteralPath $Parent `
+            -ErrorAction SilentlyContinue
+
+        if ($null -ne $ParentItem)
+        {
+            return $ParentItem.Name
+        }
+    }
+    catch
+    {
+    }
+
+    return 'unknown'
+}
+
+
+function Get-DynamicItems
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Roots,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ItemType
+    )
+
+    $Results = @()
+
+
+    foreach ($RootPath in $Roots)
+    {
+        if (-not (Test-Path $RootPath))
+        {
+            continue
+        }
+
+        $HostName = Get-HostFromRoot `
+            -RootPath $RootPath
+
+
+        $Items = Get-ChildItem `
+            -LiteralPath $RootPath `
+            -Directory `
+            -Force `
+            -ErrorAction SilentlyContinue
+
+
+        foreach ($Item in $Items)
+        {
+            $Link = Get-LinkInfo `
+                -Path $Item.FullName
+
+            $GitProbePath = $Item.FullName
+
+            if (
+                $Link.isLink -and
+                (-not [string]::IsNullOrWhiteSpace($Link.target)) -and
+                (Test-Path $Link.target)
+            )
+            {
+                $GitProbePath = $Link.target
+            }
+
+            $GitInfo = Get-GitInfo `
+                -Path $GitProbePath
+
+
+            $HasSkillMd = $false
+
+            if ($ItemType -eq 'skill')
+            {
+                $HasSkillMd = (
+                    Test-Path (
+                        Join-Path $Item.FullName 'SKILL.md'
+                    )
+                )
+            }
+
+
+            $Results += [ordered]@{
+                name = $Item.Name
+
+                type = $ItemType
+
+                host = $HostName
+
+                root = $RootPath
+
+                path = $Item.FullName
+
+                hasSkillMd = $HasSkillMd
+
+                link = $Link
+
+                git = $GitInfo
+            }
+        }
+    }
+
+
+    return $Results
+}
+
+
+function Merge-DynamicItemsByName
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Items
+    )
+
+    $Groups = [ordered]@{}
+
+
+    foreach ($Item in $Items)
+    {
+        $Key = $Item.name.ToLowerInvariant()
+
+
+        if (-not $Groups.Contains($Key))
+        {
+            $Groups[$Key] = [ordered]@{
+                name = $Item.name
+
+                locations = @()
+            }
+        }
+
+
+        $Groups[$Key].locations += [ordered]@{
+            host = $Item.host
+
+            root = $Item.root
+
+            path = $Item.path
+
+            hasSkillMd = $Item.hasSkillMd
+
+            link = $Item.link
+
+            git = $Item.git
+        }
+    }
+
+
+    $Results = @()
+
+
+    foreach ($Key in $Groups.Keys)
+    {
+        $Results += $Groups[$Key]
+    }
+
+
+    return $Results
+}
+
+
+# ============================================================
+# Package discovery
+# ============================================================
+
+function Get-NpmGlobalPackages
+{
+    $Results = @()
+
+
     try
     {
         $Npm = Get-Command `
             -Name 'npm' `
             -ErrorAction SilentlyContinue
-
 
         if ($null -eq $Npm)
         {
-            return $null
+            return $Results
         }
 
 
-        $Output = npm ls -g --depth=0 2>&1 |
+        $Raw = npm ls -g --depth=0 --json 2>$null |
             Out-String
 
 
-        if ([string]::IsNullOrWhiteSpace($Output))
+        if ([string]::IsNullOrWhiteSpace($Raw))
         {
-            return $null
+            return $Results
         }
 
 
-        return $Output.Trim()
+        $Json = $Raw |
+            ConvertFrom-Json
+
+
+        if ($null -eq $Json.dependencies)
+        {
+            return $Results
+        }
+
+
+        foreach ($Property in $Json.dependencies.PSObject.Properties)
+        {
+            $Package = $Property.Value
+
+            $Results += [ordered]@{
+                manager = 'npm'
+
+                name = $Property.Name
+
+                version = [string]$Package.version
+            }
+        }
     }
     catch
     {
-        return $null
     }
+
+
+    return @(
+        $Results |
+        Sort-Object name
+    )
 }
 
 
-function Get-OmniRouteVersion
+function Get-PipGlobalPackages
 {
+    $Results = @()
+
+
     try
     {
-        $OmniRouteCommand = Get-Command `
-            -Name 'omniroute' `
+        $Python = Get-Command `
+            -Name 'python' `
             -ErrorAction SilentlyContinue
 
-
-        if ($null -ne $OmniRouteCommand)
+        if ($null -eq $Python)
         {
-            $Version = Get-VersionSafe `
-                -Executable 'omniroute' `
-                -Arguments @('--version')
+            return $Results
+        }
 
 
-            if (-not [string]::IsNullOrWhiteSpace($Version))
-            {
-                return $Version
+        $Raw = python -m pip list --format=json 2>$null |
+            Out-String
+
+
+        if ([string]::IsNullOrWhiteSpace($Raw))
+        {
+            return $Results
+        }
+
+
+        $Packages = $Raw |
+            ConvertFrom-Json
+
+
+        foreach ($Package in @($Packages))
+        {
+            $Results += [ordered]@{
+                manager = 'pip'
+
+                name = [string]$Package.name
+
+                version = [string]$Package.version
             }
         }
-
-
-        $Npm = Get-Command `
-            -Name 'npm' `
-            -ErrorAction SilentlyContinue
-
-
-        if ($null -ne $Npm)
-        {
-            $Match = npm ls -g omniroute --depth=0 2>&1 |
-                Select-String 'omniroute@' |
-                Select-Object -First 1
-
-
-            if ($null -ne $Match)
-            {
-                return $Match.ToString().Trim()
-            }
-        }
-
-
-        return $null
     }
     catch
     {
-        return $null
     }
+
+
+    return @(
+        $Results |
+        Sort-Object name
+    )
 }
 
 
-function Get-VisualStudioVersions
-{
-    try
-    {
-        $ProgramFilesX86 = ${env:ProgramFiles(x86)}
-
-
-        if ([string]::IsNullOrWhiteSpace($ProgramFilesX86))
-        {
-            return $null
-        }
-
-
-        $VsWhere = Join-Path `
-            $ProgramFilesX86 `
-            'Microsoft Visual Studio\Installer\vswhere.exe'
-
-
-        if (-not (Test-Path $VsWhere))
-        {
-            return $null
-        }
-
-
-        $Versions = & $VsWhere `
-            -all `
-            -property catalog_productDisplayVersion `
-            2>$null
-
-
-        if ($null -eq $Versions)
-        {
-            return $null
-        }
-
-
-        return ($Versions -join ', ').Trim()
-    }
-    catch
-    {
-        return $null
-    }
-}
-
-
-function Get-QtVersions
-{
-    try
-    {
-        if (-not (Test-Path 'C:\Qt'))
-        {
-            return $null
-        }
-
-
-        $Versions = Get-ChildItem `
-            -Path 'C:\Qt' `
-            -Directory `
-            -ErrorAction SilentlyContinue |
-            Where-Object {
-                $_.Name -match '^\d+\.\d+'
-            } |
-            ForEach-Object {
-                $_.Name
-            }
-
-
-        if ($null -eq $Versions)
-        {
-            return $null
-        }
-
-
-        return ($Versions -join ', ')
-    }
-    catch
-    {
-        return $null
-    }
-}
-
-
-function Get-OsCaption
-{
-    try
-    {
-        $Os = Get-CimInstance `
-            -ClassName Win32_OperatingSystem `
-            -ErrorAction Stop
-
-
-        if ($null -eq $Os)
-        {
-            return $null
-        }
-
-
-        return $Os.Caption
-    }
-    catch
-    {
-        return $null
-    }
-}
-
+# ============================================================
+# WSL
+# ============================================================
 
 function Get-WslInventory
 {
@@ -561,17 +1050,20 @@ function Get-WslInventory
 
         $TempFile = Join-Path `
             $env:TEMP `
-            ('devmanager-wsl-' + [Guid]::NewGuid().ToString('N') + '.txt')
+            (
+                'devmanager-wsl-' +
+                [Guid]::NewGuid().ToString('N') +
+                '.txt'
+            )
 
 
         try
         {
-            $Process = Start-Process `
+            Start-Process `
                 -FilePath 'wsl.exe' `
                 -ArgumentList @('-l', '-v') `
                 -NoNewWindow `
                 -Wait `
-                -PassThru `
                 -RedirectStandardOutput $TempFile
 
 
@@ -605,18 +1097,6 @@ function Get-WslInventory
                     $Bytes.Length - 2
                 )
             }
-            elseif (
-                $Bytes.Length -ge 2 -and
-                $Bytes[0] -eq 0xFE -and
-                $Bytes[1] -eq 0xFF
-            )
-            {
-                $Text = [System.Text.Encoding]::BigEndianUnicode.GetString(
-                    $Bytes,
-                    2,
-                    $Bytes.Length - 2
-                )
-            }
             else
             {
                 $ZeroCount = 0
@@ -633,18 +1113,16 @@ function Get-WslInventory
 
                 if ($ZeroCount -gt ($Bytes.Length / 4))
                 {
-                    $Text = [System.Text.Encoding]::Unicode.GetString($Bytes)
+                    $Text = [System.Text.Encoding]::Unicode.GetString(
+                        $Bytes
+                    )
                 }
                 else
                 {
-                    $Text = [System.Text.Encoding]::UTF8.GetString($Bytes)
+                    $Text = [System.Text.Encoding]::UTF8.GetString(
+                        $Bytes
+                    )
                 }
-            }
-
-
-            if ([string]::IsNullOrWhiteSpace($Text))
-            {
-                return $Result
             }
 
 
@@ -691,7 +1169,7 @@ function Get-WslInventory
             if (Test-Path $TempFile)
             {
                 Remove-Item `
-                    -Path $TempFile `
+                    -LiteralPath $TempFile `
                     -Force `
                     -ErrorAction SilentlyContinue
             }
@@ -703,6 +1181,106 @@ function Get-WslInventory
 
 
     return $Result
+}
+
+
+# ============================================================
+# Platform inventory
+# ============================================================
+
+function Get-OsCaption
+{
+    try
+    {
+        $Os = Get-CimInstance `
+            -ClassName Win32_OperatingSystem `
+            -ErrorAction Stop
+
+        return $Os.Caption
+    }
+    catch
+    {
+        return $null
+    }
+}
+
+
+function Get-VisualStudioVersions
+{
+    try
+    {
+        $ProgramFilesX86 = ${env:ProgramFiles(x86)}
+
+        if ([string]::IsNullOrWhiteSpace($ProgramFilesX86))
+        {
+            return $null
+        }
+
+
+        $VsWhere = Join-Path `
+            $ProgramFilesX86 `
+            'Microsoft Visual Studio\Installer\vswhere.exe'
+
+
+        if (-not (Test-Path $VsWhere))
+        {
+            return $null
+        }
+
+
+        $Versions = & $VsWhere `
+            -all `
+            -property catalog_productDisplayVersion `
+            2>$null
+
+
+        return ($Versions -join ', ').Trim()
+    }
+    catch
+    {
+        return $null
+    }
+}
+
+
+function Get-QtVersions
+{
+    try
+    {
+        if (-not (Test-Path 'C:\Qt'))
+        {
+            return $null
+        }
+
+
+        $Versions = Get-ChildItem `
+            -LiteralPath 'C:\Qt' `
+            -Directory `
+            -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -match '^\d+\.\d+'
+            } |
+            ForEach-Object {
+                $_.Name
+            }
+
+
+        return ($Versions -join ', ')
+    }
+    catch
+    {
+        return $null
+    }
+}
+
+
+function Get-OmniRouteVersion
+{
+    $Version = Get-VersionSafe `
+        -Executable 'omniroute' `
+        -Arguments @('--version')
+
+    return $Version
 }
 
 
@@ -718,7 +1296,7 @@ function Get-OmniRouteModelSummary
 
         modelCount = 0
 
-        requiredModels = [ordered]@{
+        selectedChecks = [ordered]@{
             'auto/best-coding' = $false
 
             'codex/gpt-5.6-terra' = $false
@@ -736,36 +1314,17 @@ function Get-OmniRouteModelSummary
     {
         $Models = @($ModelsResponse.data)
 
-
         $Result.modelCount = $Models.Count
 
 
         foreach ($Model in $Models)
         {
-            if ($null -eq $Model)
-            {
-                continue
-            }
-
-
             $Id = [string]$Model.id
 
 
-            if ([string]::IsNullOrWhiteSpace($Id))
+            if ($Result.selectedChecks.Contains($Id))
             {
-                continue
-            }
-
-
-            if ($Id -eq 'auto/best-coding')
-            {
-                $Result.requiredModels['auto/best-coding'] = $true
-            }
-
-
-            if ($Id -eq 'codex/gpt-5.6-terra')
-            {
-                $Result.requiredModels['codex/gpt-5.6-terra'] = $true
+                $Result.selectedChecks[$Id] = $true
             }
         }
     }
@@ -777,6 +1336,10 @@ function Get-OmniRouteModelSummary
     return $Result
 }
 
+
+# ============================================================
+# Backup
+# ============================================================
 
 function Copy-SnapshotItem
 {
@@ -790,7 +1353,7 @@ function Copy-SnapshotItem
 
 
     Copy-Item `
-        -Path $Source `
+        -LiteralPath $Source `
         -Destination $Destination `
         -Recurse `
         -Force `
@@ -804,13 +1367,83 @@ function Copy-SnapshotItem
 }
 
 
-# ------------------------------------------------------------
+function Add-BackupTarget
+{
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Collections.ArrayList]$Targets,
+
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Seen,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Source,
+
+        [Parameter(Mandatory = $true)]
+        [string]$BackupName,
+
+        [string]$Type = 'directory',
+
+        [bool]$RequiresStoppedService = $false,
+
+        [string]$Category = 'config'
+    )
+
+
+    if ([string]::IsNullOrWhiteSpace($Source))
+    {
+        return
+    }
+
+
+    try
+    {
+        $Key = [System.IO.Path]::GetFullPath($Source).
+            ToLowerInvariant()
+    }
+    catch
+    {
+        $Key = $Source.ToLowerInvariant()
+    }
+
+
+    if ($Seen.ContainsKey($Key))
+    {
+        return
+    }
+
+
+    $Seen[$Key] = $true
+
+
+    [void]$Targets.Add(
+        [ordered]@{
+            name = $Name
+
+            source = $Source
+
+            backupName = $BackupName
+
+            type = $Type
+
+            category = $Category
+
+            requiresStoppedService = $RequiresStoppedService
+        }
+    )
+}
+
+
+# ============================================================
 # Header
-# ------------------------------------------------------------
+# ============================================================
 
 Write-Host ''
 Write-Host '========================================' -ForegroundColor Cyan
-Write-Host ' DevManager Snapshot v3.3' -ForegroundColor Cyan
+Write-Host ' DevManager Snapshot v4.0' -ForegroundColor Cyan
 Write-Host '========================================' -ForegroundColor Cyan
 Write-Host ''
 
@@ -819,23 +1452,21 @@ Write-Host "Timestamp : $Stamp"
 Write-Host ''
 
 
-# ------------------------------------------------------------
-# 1. Service status
-# ------------------------------------------------------------
+# ============================================================
+# 1. Service checks
+# ============================================================
 
-Write-Host '[1/4] Checking services...' -ForegroundColor Cyan
+Write-Host '[1/5] Checking infrastructure services...' -ForegroundColor Cyan
 
 
 $HeadroomListening = Test-TcpPort `
     -HostName '127.0.0.1' `
-    -Port 8787 `
-    -TimeoutMs 1000
+    -Port 8787
 
 
 $OmniRouteListening = Test-TcpPort `
     -HostName '127.0.0.1' `
-    -Port 20128 `
-    -TimeoutMs 1000
+    -Port 20128
 
 
 $HeadroomHealth = $null
@@ -879,44 +1510,21 @@ $OmniRouteModelSummary = Get-OmniRouteModelSummary `
 
 if ($HeadroomListening)
 {
-    Write-Host '  [OK]   Headroom :8787 is listening.' -ForegroundColor Green
+    Write-Host '  [OK]   Headroom :8787' -ForegroundColor Green
 }
 else
 {
-    Write-Host '  [WARN] Headroom :8787 is not listening.' -ForegroundColor Yellow
+    Write-Host '  [INFO] Headroom :8787 not listening.' -ForegroundColor DarkGray
 }
 
 
 if ($OmniRouteListening)
 {
-    Write-Host '  [OK]   OmniRoute :20128 is listening.' -ForegroundColor Green
+    Write-Host '  [OK]   OmniRoute :20128' -ForegroundColor Green
 }
 else
 {
-    Write-Host '  [WARN] OmniRoute :20128 is not listening.' -ForegroundColor Yellow
-}
-
-
-if ($null -ne $HeadroomHealth)
-{
-    Write-Host '  [OK]   Headroom health API responded.' -ForegroundColor Green
-}
-elseif ($HeadroomListening)
-{
-    Write-Host '  [WARN] Headroom port is open but /health failed.' -ForegroundColor Yellow
-}
-
-
-if ($OmniRouteModelSummary.apiReachable)
-{
-    Write-Host (
-        '  [OK]   OmniRoute /v1/models responded. Models: ' +
-        $OmniRouteModelSummary.modelCount
-    ) -ForegroundColor Green
-}
-elseif ($OmniRouteListening)
-{
-    Write-Host '  [WARN] OmniRoute port is open but /v1/models failed.' -ForegroundColor Yellow
+    Write-Host '  [INFO] OmniRoute :20128 not listening.' -ForegroundColor DarkGray
 }
 
 
@@ -924,30 +1532,19 @@ if ($RequireServicesStopped)
 {
     if ($HeadroomListening)
     {
-        throw 'Headroom is running. Stop Headroom and run the snapshot again.'
+        throw 'Headroom is running. Stop it and retry.'
     }
-
 
     if ($OmniRouteListening)
     {
-        throw 'OmniRoute is running. Stop OmniRoute and run the snapshot again.'
+        throw 'OmniRoute is running. Stop it and retry.'
     }
 }
 
 
-# ------------------------------------------------------------
-# Create snapshot directory
-# ------------------------------------------------------------
-
-if (-not (Test-Path $BackupsRoot))
-{
-    New-Item `
-        -ItemType Directory `
-        -Path $BackupsRoot `
-        -Force |
-        Out-Null
-}
-
+# ============================================================
+# Create destination
+# ============================================================
 
 New-Item `
     -ItemType Directory `
@@ -956,23 +1553,147 @@ New-Item `
     Out-Null
 
 
-# ------------------------------------------------------------
-# 2. Inventory
-# ------------------------------------------------------------
+# ============================================================
+# 2. Dynamic discovery
+# ============================================================
 
 Write-Host ''
-Write-Host '[2/4] Collecting environment inventory...' -ForegroundColor Cyan
+Write-Host '[2/5] Discovering skills, plugins and packages...' -ForegroundColor Cyan
+
+
+$SkillRoots = @(
+    Get-DiscoveryRoots `
+        -LeafName 'skills'
+)
+
+
+$PluginRoots = @(
+    Get-DiscoveryRoots `
+        -LeafName 'plugins'
+)
+
+
+$SkillLocations = @(
+    Get-DynamicItems `
+        -Roots $SkillRoots `
+        -ItemType 'skill'
+)
+
+
+$PluginLocations = @(
+    Get-DynamicItems `
+        -Roots $PluginRoots `
+        -ItemType 'plugin'
+)
+
+
+$Skills = @(
+    Merge-DynamicItemsByName `
+        -Items $SkillLocations
+)
+
+
+$Plugins = @(
+    Merge-DynamicItemsByName `
+        -Items $PluginLocations
+)
+
+
+$NpmPackages = @(
+    Get-NpmGlobalPackages
+)
+
+
+$PipPackages = @(
+    Get-PipGlobalPackages
+)
+
+
+$GlobalPackages = @(
+    $NpmPackages + $PipPackages
+)
+
+
+Write-Host (
+    '  [OK]   Skill roots discovered : ' +
+    $SkillRoots.Count
+) -ForegroundColor Green
+
+
+Write-Host (
+    '  [OK]   Skills discovered      : ' +
+    $Skills.Count
+) -ForegroundColor Green
+
+
+foreach ($Skill in $Skills)
+{
+    $Hosts = @(
+        $Skill.locations |
+        ForEach-Object {
+            $_.host
+        } |
+        Sort-Object -Unique
+    )
+
+
+    Write-Host (
+        '         skill: ' +
+        $Skill.name +
+        ' [' +
+        ($Hosts -join ', ') +
+        ']'
+    ) -ForegroundColor DarkGray
+}
+
+
+Write-Host (
+    '  [OK]   Plugin roots discovered: ' +
+    $PluginRoots.Count
+) -ForegroundColor Green
+
+
+Write-Host (
+    '  [OK]   Plugins discovered     : ' +
+    $Plugins.Count
+) -ForegroundColor Green
+
+
+foreach ($Plugin in $Plugins)
+{
+    Write-Host (
+        '         plugin: ' +
+        $Plugin.name
+    ) -ForegroundColor DarkGray
+}
+
+
+Write-Host (
+    '  [OK]   npm global packages    : ' +
+    $NpmPackages.Count
+) -ForegroundColor Green
+
+
+Write-Host (
+    '  [OK]   pip packages           : ' +
+    $PipPackages.Count
+) -ForegroundColor Green
+
+
+# ============================================================
+# 3. Environment inventory
+# ============================================================
+
+Write-Host ''
+Write-Host '[3/5] Building environment inventory...' -ForegroundColor Cyan
 
 
 $HeadroomExe = Get-CommandPath `
     -Name 'headroom' `
     -FallbackPaths @(
-        "$env:USERPROFILE\.local\bin\headroom.exe",
-        "$env:USERPROFILE\.local\bin\headroom.EXE"
+        "$env:USERPROFILE\.local\bin\headroom.exe"
     )
 
-
-$OsCaption = Get-OsCaption
 
 $WslInventory = Get-WslInventory
 
@@ -986,10 +1707,7 @@ if ($null -ne $HeadroomHealth)
 {
     try
     {
-        if ($null -ne $HeadroomHealth.version)
-        {
-            $HeadroomRunningVersion = $HeadroomHealth.version
-        }
+        $HeadroomRunningVersion = [string]$HeadroomHealth.version
     }
     catch
     {
@@ -998,10 +1716,7 @@ if ($null -ne $HeadroomHealth)
 
     try
     {
-        if ($null -ne $HeadroomHealth.ready)
-        {
-            $HeadroomReady = [bool]$HeadroomHealth.ready
-        }
+        $HeadroomReady = [bool]$HeadroomHealth.ready
     }
     catch
     {
@@ -1010,10 +1725,9 @@ if ($null -ne $HeadroomHealth)
 
     try
     {
-        if ($null -ne $HeadroomHealth.checks.upstream.url)
-        {
-            $HeadroomUpstreamUrl = [string]$HeadroomHealth.checks.upstream.url
-        }
+        $HeadroomUpstreamUrl = [string](
+            $HeadroomHealth.checks.upstream.url
+        )
     }
     catch
     {
@@ -1022,9 +1736,9 @@ if ($null -ne $HeadroomHealth)
 
 
 $Inventory = [ordered]@{
-    schemaVersion = 3
+    schemaVersion = 4
 
-    snapshotVersion = '3.3'
+    snapshotVersion = '4.0'
 
     capturedAt = (Get-Date).ToString('o')
 
@@ -1035,64 +1749,52 @@ $Inventory = [ordered]@{
     root = $Root
 
     os = [ordered]@{
-        caption = $OsCaption
+        caption = Get-OsCaption
 
-        version = (
-            [Environment]::OSVersion.Version.ToString()
-        )
+        version = [Environment]::OSVersion.Version.ToString()
 
-        is64Bit = (
-            [Environment]::Is64BitOperatingSystem
-        )
+        is64Bit = [Environment]::Is64BitOperatingSystem
     }
 
     tools = [ordered]@{
-        docker = Get-VersionSafe `
-            -Executable 'docker' `
-            -Arguments @('--version')
+        docker = Get-VersionSafe 'docker' @('--version')
 
-        node = Get-VersionSafe `
-            -Executable 'node' `
-            -Arguments @('--version')
+        node = Get-VersionSafe 'node' @('--version')
 
-        npm = Get-VersionSafe `
-            -Executable 'npm' `
-            -Arguments @('--version')
+        npm = Get-VersionSafe 'npm' @('--version')
 
-        python = Get-VersionSafe `
-            -Executable 'python' `
-            -Arguments @('--version')
+        python = Get-VersionSafe 'python' @('--version')
 
-        cmake = Get-VersionSafe `
-            -Executable 'cmake' `
-            -Arguments @('--version')
+        cmake = Get-VersionSafe 'cmake' @('--version')
 
-        git = Get-VersionSafe `
-            -Executable 'git' `
-            -Arguments @('--version')
+        git = Get-VersionSafe 'git' @('--version')
 
-        claude = Get-VersionSafe `
-            -Executable 'claude' `
-            -Arguments @('--version')
+        claude = Get-VersionSafe 'claude' @('--version')
 
-        codex = Get-VersionSafe `
-            -Executable 'codex' `
-            -Arguments @('--version')
+        codex = Get-VersionSafe 'codex' @('--version')
 
-        headroom = Get-VersionSafe `
-            -Executable $HeadroomExe `
-            -Arguments @('--version')
+        headroom = Get-VersionSafe $HeadroomExe @('--version')
 
         omniroute = Get-OmniRouteVersion
     }
-
-    npmGlobal = Get-NpmGlobal
 
     qt = Get-QtVersions
 
     visualStudio = Get-VisualStudioVersions
 
     wsl = $WslInventory
+
+    discovery = [ordered]@{
+        skillRoots = $SkillRoots
+
+        pluginRoots = $PluginRoots
+
+        skills = $Skills
+
+        plugins = $Plugins
+
+        globalPackages = $GlobalPackages
+    }
 
     services = [ordered]@{
         headroom = [ordered]@{
@@ -1104,9 +1806,9 @@ $Inventory = [ordered]@{
                 $null -ne $HeadroomHealth
             )
 
-            installedExecutable = $HeadroomExe
+            executable = $HeadroomExe
 
-            runningVersion = $HeadroomRunningVersion
+            version = $HeadroomRunningVersion
 
             ready = $HeadroomReady
 
@@ -1126,8 +1828,8 @@ $Inventory = [ordered]@{
                 [int]$OmniRouteModelSummary.modelCount
             )
 
-            requiredModels = (
-                $OmniRouteModelSummary.requiredModels
+            selectedChecks = (
+                $OmniRouteModelSummary.selectedChecks
             )
         }
     }
@@ -1136,276 +1838,286 @@ $Inventory = [ordered]@{
 }
 
 
-# ------------------------------------------------------------
-# Environment variable inventory
-# ------------------------------------------------------------
+Get-ChildItem Env: |
+    Where-Object {
+        $_.Name -match (
+            'ANTHROPIC|' +
+            'CLAUDE|' +
+            'CODEX|' +
+            'OMNIROUTE|' +
+            'HEADROOM|' +
+            'DOCKER|' +
+            'QT|' +
+            'CMAKE|' +
+            'GEMINI'
+        )
+    } |
+    ForEach-Object {
 
-try
-{
-    Get-ChildItem Env: |
-        Where-Object {
-            $_.Name -match (
-                'ANTHROPIC|' +
-                'CLAUDE|' +
-                'OMNIROUTE|' +
-                'HEADROOM|' +
-                'DOCKER|' +
-                'QT|' +
-                'CMAKE'
-            )
-        } |
-        ForEach-Object {
-
-            $Value = $_.Value
+        $Value = $_.Value
 
 
-            if (Test-SecretName -Name $_.Name)
-            {
-                $Value = Mask-Secret -Value $Value
-            }
-
-
-            $Inventory.env[$_.Name] = $Value
+        if (Test-SecretName $_.Name)
+        {
+            $Value = Mask-Secret $Value
         }
-}
-catch
-{
-    Write-Host (
-        '  [WARN] Environment variable inventory failed: ' +
-        $_.Exception.Message
-    ) -ForegroundColor Yellow
-}
 
 
-# ------------------------------------------------------------
-# Write root inventory
-# ------------------------------------------------------------
+        $Inventory.env[$_.Name] = $Value
+    }
+
 
 $InventoryJson = $Inventory |
-    ConvertTo-Json -Depth 10
+    ConvertTo-Json -Depth 20
 
 
 $InventoryJson |
     Set-Content `
-        -Path $InventoryPath `
+        -LiteralPath $InventoryPath `
         -Encoding UTF8
 
-
-# ------------------------------------------------------------
-# Write snapshot-local inventory
-# ------------------------------------------------------------
 
 $InventoryJson |
     Set-Content `
-        -Path $SnapshotInventoryPath `
+        -LiteralPath $SnapshotInventoryPath `
         -Encoding UTF8
 
 
-Write-Host "  [OK]   Root inventory     : $InventoryPath" -ForegroundColor Green
-
-Write-Host "  [OK]   Snapshot inventory : $SnapshotInventoryPath" -ForegroundColor Green
+Write-Host "  [OK]   $InventoryPath" -ForegroundColor Green
 
 
-# ------------------------------------------------------------
-# Display detected versions
-# ------------------------------------------------------------
-
-$ToolDisplay = @(
-    @('Docker', $Inventory.tools.docker),
-    @('Node', $Inventory.tools.node),
-    @('npm', $Inventory.tools.npm),
-    @('Python', $Inventory.tools.python),
-    @('CMake', $Inventory.tools.cmake),
-    @('Git', $Inventory.tools.git),
-    @('Claude', $Inventory.tools.claude),
-    @('Codex', $Inventory.tools.codex),
-    @('Headroom', $Inventory.tools.headroom),
-    @('OmniRoute', $Inventory.tools.omniroute)
-)
-
-
-foreach ($Tool in $ToolDisplay)
-{
-    $ToolName = $Tool[0]
-    $ToolVersion = $Tool[1]
-
-
-    if ([string]::IsNullOrWhiteSpace([string]$ToolVersion))
-    {
-        Write-Host (
-            '  [SKIP] ' +
-            $ToolName +
-            ' version not detected.'
-        ) -ForegroundColor DarkGray
-    }
-    else
-    {
-        Write-Host (
-            '  [OK]   ' +
-            $ToolName +
-            ': ' +
-            $ToolVersion
-        ) -ForegroundColor Green
-    }
-}
-
-
-# ------------------------------------------------------------
-# Display WSL summary
-# ------------------------------------------------------------
-
-if ($WslInventory.installed)
-{
-    Write-Host '  [OK]   WSL is installed.' -ForegroundColor Green
-
-
-    if ($WslInventory.distributions.Count -eq 0)
-    {
-        Write-Host '  [INFO] No WSL distributions detected.' -ForegroundColor DarkGray
-    }
-    else
-    {
-        foreach ($Distro in $WslInventory.distributions)
-        {
-            Write-Host (
-                '  [INFO] WSL: ' +
-                $Distro.name +
-                ' | ' +
-                $Distro.state +
-                ' | Version ' +
-                $Distro.version
-            ) -ForegroundColor DarkGray
-        }
-    }
-}
-else
-{
-    Write-Host '  [SKIP] WSL is not installed.' -ForegroundColor DarkGray
-}
-
-
-# ------------------------------------------------------------
-# Display required OmniRoute model status
-# ------------------------------------------------------------
-
-if ($OmniRouteModelSummary.apiReachable)
-{
-    foreach ($RequiredModelName in $OmniRouteModelSummary.requiredModels.Keys)
-    {
-        $Exists = $OmniRouteModelSummary.requiredModels[$RequiredModelName]
-
-
-        if ($Exists)
-        {
-            Write-Host (
-                '  [OK]   OmniRoute model: ' +
-                $RequiredModelName
-            ) -ForegroundColor Green
-        }
-        else
-        {
-            Write-Host (
-                '  [WARN] OmniRoute model missing: ' +
-                $RequiredModelName
-            ) -ForegroundColor Yellow
-        }
-    }
-}
-
-
-# ------------------------------------------------------------
-# 3. Snapshot targets
-# ------------------------------------------------------------
+# ============================================================
+# 4. Build backup plan dynamically
+# ============================================================
 
 Write-Host ''
-Write-Host '[3/4] Backing up configuration...' -ForegroundColor Cyan
+Write-Host '[4/5] Backing up discovered environment...' -ForegroundColor Cyan
 
 
-$Targets = @(
-    [ordered]@{
-        name = 'headroom'
+$Targets = New-Object System.Collections.ArrayList
+$SeenTargets = @{}
 
-        source = "$env:USERPROFILE\.headroom"
 
-        backupName = '.headroom'
-
-        type = 'directory'
-
-        requiresStoppedService = $true
-    },
-
-    [ordered]@{
-        name = 'omniroute-userprofile'
-
-        source = "$env:USERPROFILE\.omniroute"
-
-        backupName = '.omniroute'
-
-        type = 'directory'
-
-        requiresStoppedService = $true
-    },
-
-    [ordered]@{
-        name = 'omniroute-appdata'
-
-        source = "$env:APPDATA\omniroute"
-
-        backupName = 'omniroute-appdata'
-
-        type = 'directory'
-
-        requiresStoppedService = $true
-    },
-
+$CoreDirectories = @(
     [ordered]@{
         name = 'claude'
-
         source = "$env:USERPROFILE\.claude"
-
-        backupName = '.claude'
-
-        type = 'directory'
-
-        requiresStoppedService = $false
+        backup = '.claude'
+        stopped = $false
     },
 
     [ordered]@{
         name = 'codex'
-
         source = "$env:USERPROFILE\.codex"
-
-        backupName = '.codex'
-
-        type = 'directory'
-
-        requiresStoppedService = $false
+        backup = '.codex'
+        stopped = $false
     },
 
     [ordered]@{
-        name = 'docker-settings'
-
-        source = "$env:APPDATA\Docker\settings.json"
-
-        backupName = 'docker-settings.json'
-
-        type = 'file'
-
-        requiresStoppedService = $true
+        name = 'agents'
+        source = "$env:USERPROFILE\.agents"
+        backup = '.agents'
+        stopped = $false
     },
 
     [ordered]@{
-        name = 'wslconfig'
+        name = 'gemini'
+        source = "$env:USERPROFILE\.gemini"
+        backup = '.gemini'
+        stopped = $false
+    },
 
-        source = "$env:USERPROFILE\.wslconfig"
+    [ordered]@{
+        name = 'headroom'
+        source = "$env:USERPROFILE\.headroom"
+        backup = '.headroom'
+        stopped = $true
+    },
 
-        backupName = '.wslconfig'
-
-        type = 'file'
-
-        requiresStoppedService = $false
+    [ordered]@{
+        name = 'omniroute'
+        source = "$env:USERPROFILE\.omniroute"
+        backup = '.omniroute'
+        stopped = $true
     }
 )
+
+
+foreach ($Core in $CoreDirectories)
+{
+    Add-BackupTarget `
+        -Targets $Targets `
+        -Seen $SeenTargets `
+        -Name $Core.name `
+        -Source $Core.source `
+        -BackupName $Core.backup `
+        -RequiresStoppedService $Core.stopped `
+        -Category 'core'
+}
+
+
+# ------------------------------------------------------------
+# Optional machine configuration
+# ------------------------------------------------------------
+
+Add-BackupTarget `
+    -Targets $Targets `
+    -Seen $SeenTargets `
+    -Name 'omniroute-appdata' `
+    -Source "$env:APPDATA\omniroute" `
+    -BackupName 'omniroute-appdata' `
+    -Category 'core' `
+    -RequiresStoppedService $true
+
+
+Add-BackupTarget `
+    -Targets $Targets `
+    -Seen $SeenTargets `
+    -Name 'docker-settings' `
+    -Source "$env:APPDATA\Docker\settings.json" `
+    -BackupName 'docker-settings.json' `
+    -Type 'file' `
+    -Category 'machine'
+
+
+Add-BackupTarget `
+    -Targets $Targets `
+    -Seen $SeenTargets `
+    -Name 'wslconfig' `
+    -Source "$env:USERPROFILE\.wslconfig" `
+    -BackupName '.wslconfig' `
+    -Type 'file' `
+    -Category 'machine'
+
+
+# ------------------------------------------------------------
+# Add dynamically discovered skills not covered by core roots
+# ------------------------------------------------------------
+
+$CoreSourcePaths = @(
+    $CoreDirectories |
+    ForEach-Object {
+        $_.source
+    }
+)
+
+
+foreach ($SkillLocation in $SkillLocations)
+{
+    $Covered = $false
+
+
+    foreach ($CoreSource in $CoreSourcePaths)
+    {
+        if (
+            (Test-Path $CoreSource) -and
+            (Test-PathInside `
+                -ChildPath $SkillLocation.path `
+                -ParentPath $CoreSource)
+        )
+        {
+            $Covered = $true
+            break
+        }
+    }
+
+
+    if ($Covered)
+    {
+        continue
+    }
+
+
+    $SafeHost = Get-SafeName $SkillLocation.host
+    $SafeSkill = Get-SafeName $SkillLocation.name
+    $Hash = Get-ShortHash $SkillLocation.path
+
+
+    $BackupName = Join-Path `
+        'discovered\skills' `
+        (
+            $SafeHost +
+            '__' +
+            $SafeSkill +
+            '__' +
+            $Hash
+        )
+
+
+    Add-BackupTarget `
+        -Targets $Targets `
+        -Seen $SeenTargets `
+        -Name (
+            'skill:' +
+            $SkillLocation.host +
+            ':' +
+            $SkillLocation.name
+        ) `
+        -Source $SkillLocation.path `
+        -BackupName $BackupName `
+        -Category 'skill'
+}
+
+
+# ------------------------------------------------------------
+# Add dynamically discovered plugins not covered by core roots
+# ------------------------------------------------------------
+
+foreach ($PluginLocation in $PluginLocations)
+{
+    $Covered = $false
+
+
+    foreach ($CoreSource in $CoreSourcePaths)
+    {
+        if (
+            (Test-Path $CoreSource) -and
+            (Test-PathInside `
+                -ChildPath $PluginLocation.path `
+                -ParentPath $CoreSource)
+        )
+        {
+            $Covered = $true
+            break
+        }
+    }
+
+
+    if ($Covered)
+    {
+        continue
+    }
+
+
+    $SafeHost = Get-SafeName $PluginLocation.host
+    $SafePlugin = Get-SafeName $PluginLocation.name
+    $Hash = Get-ShortHash $PluginLocation.path
+
+
+    $BackupName = Join-Path `
+        'discovered\plugins' `
+        (
+            $SafeHost +
+            '__' +
+            $SafePlugin +
+            '__' +
+            $Hash
+        )
+
+
+    Add-BackupTarget `
+        -Targets $Targets `
+        -Seen $SeenTargets `
+        -Name (
+            'plugin:' +
+            $PluginLocation.host +
+            ':' +
+            $PluginLocation.name
+        ) `
+        -Source $PluginLocation.path `
+        -BackupName $BackupName `
+        -Category 'plugin'
+}
 
 
 $Components = @()
@@ -1413,26 +2125,21 @@ $Components = @()
 
 foreach ($Target in $Targets)
 {
-    $Source = $Target.source
-
-    $BackupPath = Join-Path `
-        $Dest `
-        $Target.backupName
-
-
-    $SourceExists = Test-Path $Source
+    $Exists = Test-Path $Target.source
 
 
     $Component = [ordered]@{
         name = $Target.name
 
-        source = $Source
+        category = $Target.category
+
+        source = $Target.source
 
         backupName = $Target.backupName
 
         type = $Target.type
 
-        exists = $SourceExists
+        exists = $Exists
 
         copied = $false
 
@@ -1444,15 +2151,13 @@ foreach ($Target in $Targets)
     }
 
 
-    if (-not $SourceExists)
+    if (-not $Exists)
     {
         Write-Host (
             '  [SKIP] ' +
             $Target.name +
-            ' not found: ' +
-            $Source
+            ' not found.'
         ) -ForegroundColor DarkGray
-
 
         $Components += $Component
 
@@ -1460,10 +2165,30 @@ foreach ($Target in $Targets)
     }
 
 
+    $BackupPath = Join-Path `
+        $Dest `
+        $Target.backupName
+
+
+    $BackupParent = Split-Path `
+        -Path $BackupPath `
+        -Parent
+
+
+    if (-not (Test-Path $BackupParent))
+    {
+        New-Item `
+            -ItemType Directory `
+            -Path $BackupParent `
+            -Force |
+            Out-Null
+    }
+
+
     try
     {
         Copy-SnapshotItem `
-            -Source $Source `
+            -Source $Target.source `
             -Destination $BackupPath
 
 
@@ -1495,6 +2220,14 @@ foreach ($Target in $Targets)
 }
 
 
+# ============================================================
+# 5. Manifest
+# ============================================================
+
+Write-Host ''
+Write-Host '[5/5] Writing manifest...' -ForegroundColor Cyan
+
+
 $FailedComponents = @(
     $Components |
     Where-Object {
@@ -1504,14 +2237,6 @@ $FailedComponents = @(
 )
 
 
-# ------------------------------------------------------------
-# 4. Manifest
-# ------------------------------------------------------------
-
-Write-Host ''
-Write-Host '[4/4] Writing manifest...' -ForegroundColor Cyan
-
-
 $ConsistentSnapshot = (
     (-not $HeadroomListening) -and
     (-not $OmniRouteListening)
@@ -1519,9 +2244,9 @@ $ConsistentSnapshot = (
 
 
 $Manifest = [ordered]@{
-    schemaVersion = 3
+    schemaVersion = 4
 
-    snapshotVersion = '3.3'
+    snapshotVersion = '4.0'
 
     stamp = $Stamp
 
@@ -1535,6 +2260,20 @@ $Manifest = [ordered]@{
 
     inventoryFile = 'inventory.json'
 
+    discovery = [ordered]@{
+        skillRootCount = $SkillRoots.Count
+
+        skillCount = $Skills.Count
+
+        pluginRootCount = $PluginRoots.Count
+
+        pluginCount = $Plugins.Count
+
+        npmPackageCount = $NpmPackages.Count
+
+        pipPackageCount = $PipPackages.Count
+    }
+
     serviceStateAtSnapshot = [ordered]@{
         headroomListening = $HeadroomListening
 
@@ -1547,45 +2286,47 @@ $Manifest = [ordered]@{
 
     warnings = @(
         'Backup data may contain OAuth tokens, API keys and other secrets.',
-        'Never commit the backups directory to Git.',
-        'An OmniRoute snapshot taken while OmniRoute is running may not represent a fully consistent SQLite state.',
-        'Docker settings.json may not be compatible with a different Docker Desktop version.',
-        '.wslconfig may require adjustment for another machine.',
-        'User profile paths stored in backed-up configuration files may require migration handling on another PC.'
+        'Never commit backups/ to Git.',
+        'Environment variables in inventory.json are masked and are validation data only.',
+        'Do not restore masked secret values as real environment variables.',
+        'A live OmniRoute snapshot may contain changing database state.',
+        'Machine-specific Docker and WSL settings require explicit migration handling.',
+        'Absolute paths inside third-party configuration may require path translation on another PC.',
+        'Service-specific health probes are adapters; skill and package discovery is dynamic.'
     )
 }
 
 
 $Manifest |
-    ConvertTo-Json -Depth 10 |
+    ConvertTo-Json -Depth 20 |
     Set-Content `
-        -Path $ManifestPath `
+        -LiteralPath $ManifestPath `
         -Encoding UTF8
 
 
-Write-Host "  [OK]   Manifest: $ManifestPath" -ForegroundColor Green
+Write-Host "  [OK]   $ManifestPath" -ForegroundColor Green
 
 
-# ------------------------------------------------------------
+# ============================================================
 # Result
-# ------------------------------------------------------------
+# ============================================================
 
 Write-Host ''
 Write-Host '========================================' -ForegroundColor Cyan
 Write-Host ' Snapshot Result' -ForegroundColor Cyan
 Write-Host '========================================' -ForegroundColor Cyan
+Write-Host ''
 
 
 if ($FailedComponents.Count -gt 0)
 {
-    Write-Host ''
-    Write-Host '[FAIL] Snapshot completed with backup errors.' -ForegroundColor Red
+    Write-Host '[FAIL] Snapshot has backup errors.' -ForegroundColor Red
 
 
     foreach ($Failed in $FailedComponents)
     {
         Write-Host (
-            '  - ' +
+            '       ' +
             $Failed.name +
             ': ' +
             $Failed.error
@@ -1594,18 +2335,12 @@ if ($FailedComponents.Count -gt 0)
 
 
     Write-Host ''
-    Write-Host "Snapshot directory: $Dest" -ForegroundColor Yellow
-
-    Write-Host (
-        'Do not use this snapshot for restore until the failures are resolved.'
-    ) -ForegroundColor Yellow
-
+    Write-Host "Snapshot: $Dest" -ForegroundColor Yellow
 
     exit 2
 }
 
 
-Write-Host ''
 Write-Host '[OK] Snapshot completed successfully.' -ForegroundColor Green
 
 Write-Host ''
@@ -1615,14 +2350,34 @@ Write-Host "Snapshot inventory : $SnapshotInventoryPath"
 Write-Host "Manifest           : $ManifestPath"
 
 
+Write-Host ''
+Write-Host 'Dynamic discovery:' -ForegroundColor Cyan
+
+Write-Host (
+    '  Skills          : ' +
+    $Skills.Count
+)
+
+Write-Host (
+    '  Plugins         : ' +
+    $Plugins.Count
+)
+
+Write-Host (
+    '  npm packages    : ' +
+    $NpmPackages.Count
+)
+
+Write-Host (
+    '  pip packages    : ' +
+    $PipPackages.Count
+)
+
+
 if ($ConsistentSnapshot)
 {
     Write-Host ''
     Write-Host '[OK] Snapshot consistency: MIGRATION READY' -ForegroundColor Green
-
-    Write-Host (
-        '     Headroom and OmniRoute were stopped during snapshot.'
-    )
 }
 else
 {
@@ -1633,11 +2388,7 @@ else
     ) -ForegroundColor Yellow
 
     Write-Host (
-        '       Headroom and/or OmniRoute were running.'
-    ) -ForegroundColor Yellow
-
-    Write-Host (
-        '       Suitable for inspection/testing, but not recommended as the final migration snapshot.'
+        '       Stop Headroom and OmniRoute for the final migration snapshot.'
     ) -ForegroundColor Yellow
 }
 
@@ -1648,40 +2399,12 @@ Write-Host ' NO' -ForegroundColor Green
 
 
 Write-Host ''
-Write-Host 'Created/updated files:'
-
-Write-Host "  $InventoryPath"
-Write-Host "  $Dest"
-Write-Host "  $SnapshotInventoryPath"
-Write-Host "  $ManifestPath"
-
-
-Write-Host ''
-Write-Host 'WARNING:' -ForegroundColor Yellow
+Write-Host 'IMPORTANT:' -ForegroundColor Yellow
 
 Write-Host (
-    '  The snapshot may contain authentication credentials.'
+    '  Snapshot data may contain authentication credentials.'
 )
 
 Write-Host (
-    '  Keep the backups directory private and out of Git.'
-)
-
-
-Write-Host ''
-Write-Host 'Suggested restore command:' -ForegroundColor Cyan
-
-
-$RestoreScript = Join-Path `
-    $PSScriptRoot `
-    'restore-current.ps1'
-
-
-Write-Host (
-    'powershell.exe -ExecutionPolicy Bypass ' +
-    '-File "' +
-    $RestoreScript +
-    '" -From "' +
-    $Dest +
-    '"'
+    '  Keep backups/ private and out of Git.'
 )
