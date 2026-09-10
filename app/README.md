@@ -3,11 +3,16 @@
 Snapshot/Restore core, being ported from the PowerShell reference in
 `../scripts/` per `../docs/DevManager-Design-v2.docx`.
 
-## Status — Phase 1: read-only environment scan
+## Status — Phase 1: read-only environment scan (+ GUI shell)
 
 `devmanager-scan` walks the local AI dev environment and writes one inventory
 JSON. It **writes nothing else** — no config dirs, no service control, no git
 mutation. It is the C++ counterpart of steps 1–3 of `snapshot-current.ps1`.
+
+`devmanager-gui` is the Qt Widgets shell over that scan: a tabbed dashboard
+(Environment / Skills / Plugins / Packages / Env Vars) that runs the scan on a
+background thread via `AppController` — the seam the later Snapshot/Restore
+managers plug into (design doc s4.3). Read-only, same as the CLI.
 
 Ported so far: `ToolScanner`, `SkillScanner` (link + git + classification,
 merge-by-name), `PluginScanner`, `PackageScanner`, `WslScanner`,
@@ -38,6 +43,7 @@ Override per machine with a git-ignored `CMakeUserPresets.json`.
 
 ```
 ./build/Debug/devmanager-scan.exe --root <project-root> --out inventory.cpp.json
+./build/Debug/devmanager-gui.exe
 ```
 
 Add `C:/Qt/6.10.3/msvc2022_64/bin` to `PATH` so the Qt DLLs resolve.

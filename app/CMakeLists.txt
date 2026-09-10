@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
 # Qt prebuilts (msvc2022_64) are v143 ABI. Build with -T v143 (see CMakePresets.json).
-find_package(Qt6 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Concurrent)
 
 # ---- core library: pure QtCore, no Widgets, so it stays unit-testable ----
 add_library(devmanager_core STATIC
@@ -23,6 +23,16 @@ target_link_libraries(devmanager_core PUBLIC Qt6::Core)
 # ---- Phase 1 CLI: read-only environment scan -> inventory json ----
 add_executable(devmanager-scan cli/main.cpp)
 target_link_libraries(devmanager-scan PRIVATE devmanager_core)
+
+# ---- GUI shell (Qt Widgets): dashboard over the read-only scan ----
+add_executable(devmanager-gui WIN32
+    gui/main.cpp
+    gui/app_controller.cpp
+    gui/main_window.cpp
+)
+target_include_directories(devmanager-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(devmanager-gui PRIVATE
+    devmanager_core Qt6::Widgets Qt6::Concurrent)
 
 # ---- tests ----
 option(DEVMANAGER_BUILD_TESTS "Build unit tests" ON)
