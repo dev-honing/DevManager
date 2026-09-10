@@ -19,12 +19,26 @@ struct ToolSpec {
     QStringList fallbackPaths;  // absolute/`~`-relative, tried if not on PATH
 };
 
+struct ServiceLifecycleSpec {
+    QString exe;                 // resolved on PATH
+    QStringList statusArgs;
+    QStringList stopArgs;
+    QStringList startArgs;
+    QStringList restartArgs;
+    bool startDetached = true;   // start command runs in the background (e.g. a server)
+
+    bool canControl() const {
+        return !exe.isEmpty() && (!stopArgs.isEmpty() || !startArgs.isEmpty());
+    }
+};
+
 struct ServiceSpec {
     QString id;
     QString name;               // display
     int port = 0;               // >0 => TCP liveness check on 127.0.0.1:port
     QStringList cliCheck;        // non-empty => run it; exit 0 + output => running
     bool wslRunning = false;     // true => `wsl -l -q --running` non-empty => running
+    ServiceLifecycleSpec lifecycle;
 };
 
 struct PackageManagerSpec {

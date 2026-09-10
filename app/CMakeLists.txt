@@ -18,6 +18,7 @@ add_library(devmanager_core STATIC
     core/scan/skill_scanner.cpp
     core/scan/env_scanner.cpp
     core/service/service_probe.cpp
+    core/service/service_lifecycle.cpp
     core/snapshot/snapshot_index.cpp
     core/snapshot/snapshot_preview.cpp
     core/snapshot/restore_preview.cpp
@@ -70,4 +71,8 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_snapshot_executor tests/tst_snapshot_executor.cpp)
     target_link_libraries(tst_snapshot_executor PRIVATE devmanager_core Qt6::Test)
     add_test(NAME snapshot_executor COMMAND tst_snapshot_executor)
+
+    add_executable(tst_service_lifecycle tests/tst_service_lifecycle.cpp)
+    target_link_libraries(tst_service_lifecycle PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME service_lifecycle COMMAND tst_service_lifecycle)
 endif()

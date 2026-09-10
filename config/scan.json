@@ -19,8 +19,17 @@
   ],
 
   "services": [
-    { "id": "headroom",  "name": "Headroom",  "port": 8787 },
-    { "id": "omniroute", "name": "OmniRoute", "port": 20128 },
+    { "id": "headroom", "name": "Headroom", "port": 8787,
+      "lifecycle": { "exe": "headroom",
+        "status":  ["install", "status",  "--profile", "init-user"],
+        "stop":    ["install", "stop",    "--profile", "init-user"],
+        "start":   ["install", "start",   "--profile", "init-user"],
+        "restart": ["install", "restart", "--profile", "init-user"],
+        "startDetached": false } },
+    { "id": "omniroute", "name": "OmniRoute", "port": 20128,
+      "lifecycle": { "exe": "omniroute",
+        "status": ["status"], "stop": ["stop"], "start": ["serve"], "restart": ["restart"],
+        "startDetached": true } },
     { "id": "ollama",    "name": "Ollama",    "port": 11434 },
     { "id": "docker",    "name": "Docker",    "cliCheck": ["docker", "version", "--format", "{{.Server.Version}}"] },
     { "id": "wsl",       "name": "WSL",       "wslRunning": true }

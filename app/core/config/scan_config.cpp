@@ -34,11 +34,18 @@ ScanConfig ScanConfig::defaults()
         {"omniroute", "ai", {"--version"}, {}},
     };
     c.services = {
-        {"headroom", "Headroom", 8787, {}, false},
-        {"omniroute", "OmniRoute", 20128, {}, false},
-        {"ollama", "Ollama", 11434, {}, false},
-        {"docker", "Docker", 0, {"docker", "version", "--format", "{{.Server.Version}}"}, false},
-        {"wsl", "WSL", 0, {}, true},
+        {"headroom", "Headroom", 8787, {}, false,
+         {"headroom",
+          {"install", "status", "--profile", "init-user"},
+          {"install", "stop", "--profile", "init-user"},
+          {"install", "start", "--profile", "init-user"},
+          {"install", "restart", "--profile", "init-user"},
+          false}},
+        {"omniroute", "OmniRoute", 20128, {}, false,
+         {"omniroute", {"status"}, {"stop"}, {"serve"}, {"restart"}, true}},
+        {"ollama", "Ollama", 11434, {}, false, {}},
+        {"docker", "Docker", 0, {"docker", "version", "--format", "{{.Server.Version}}"}, false, {}},
+        {"wsl", "WSL", 0, {}, true, {}},
     };
     c.packageManagers = {
         {"npm", {}, {"ls", "-g", "--depth=0", "--json"}, "npm-deps"},
@@ -183,6 +190,15 @@ ScanConfig ScanConfig::load()
             s.port = o.value("port").toInt(0);
             s.cliCheck = jsonStrings(o.value("cliCheck"));
             s.wslRunning = o.value("wslRunning").toBool(false);
+            if (o.contains("lifecycle")) {
+                const QJsonObject lc = o.value("lifecycle").toObject();
+                s.lifecycle.exe = lc.value("exe").toString();
+                s.lifecycle.statusArgs = jsonStrings(lc.value("status"));
+                s.lifecycle.stopArgs = jsonStrings(lc.value("stop"));
+                s.lifecycle.startArgs = jsonStrings(lc.value("start"));
+                s.lifecycle.restartArgs = jsonStrings(lc.value("restart"));
+                s.lifecycle.startDetached = lc.value("startDetached").toBool(true);
+            }
             if (!s.id.isEmpty())
                 c.services << s;
         }

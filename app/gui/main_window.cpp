@@ -110,6 +110,25 @@ void MainWindow::buildUi()
         if (!m_devRoot.isEmpty())
             QDesktopServices::openUrl(QUrl::fromLocalFile(m_devRoot));
     });
+    connect(m_rightPanel, &RightPanel::serviceControlRequested, this,
+            [this](const QString& id, LifecycleOp op) {
+                const QString verb = lifecycleOpName(op);
+                if (QMessageBox::question(
+                        this, "Service control",
+                        QString("%1 %2 now?\n\nThis changes the running service.")
+                            .arg(verb.left(1).toUpper() + verb.mid(1), id),
+                        QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel)
+                    == QMessageBox::Yes)
+                    m_controller.controlService(id, op);
+            });
+    connect(&m_controller, &AppController::serviceControlled, this,
+            [this](const LifecycleResult& r) {
+                statusBar()->showMessage(
+                    QString("%1 %2: %3")
+                        .arg(r.serviceId, lifecycleOpName(r.op),
+                             r.ok ? QStringLiteral("ok") : r.error),
+                    6000);
+            });
 
     auto* rightSide = new QWidget;
     auto* rightLay = new QVBoxLayout(rightSide);
