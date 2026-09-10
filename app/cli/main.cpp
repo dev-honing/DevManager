@@ -10,6 +10,7 @@
 #include "service/service_probe.h"
 #include "snapshot/restore_executor.h"
 #include "snapshot/restore_preview.h"
+#include "snapshot/snapshot_diff.h"
 #include "snapshot/snapshot_executor.h"
 #include "snapshot/snapshot_index.h"
 #include "snapshot/snapshot_preview.h"
@@ -44,12 +45,16 @@ int main(int argc, char** argv)
     QCommandLineOption verifyOpt("verify", "Re-hash a snapshot dir and check it "
                                            "against its manifest.",
                                  "snapshot-dir");
+    QCommandLineOption diffOpt("diff", "Compare this snapshot dir (A)...", "dir-a");
+    QCommandLineOption diffToOpt("diff-to", "...against this one (B).", "dir-b");
     parser.addOption(outOpt);
     parser.addOption(rootOpt);
     parser.addOption(snapOpt);
     parser.addOption(restoreOpt);
     parser.addOption(applyOpt);
     parser.addOption(verifyOpt);
+    parser.addOption(diffOpt);
+    parser.addOption(diffToOpt);
     parser.process(app);
 
     if (parser.isSet(rootOpt))
@@ -70,6 +75,27 @@ int main(int argc, char** argv)
         err << (v.ok ? "OK  " : "BAD ") << v.okCount << " ok, " << v.badCount
             << " bad, " << v.skippedCount << " skipped\n";
         return v.ok ? 0 : 2;
+    }
+
+    // ---- diff mode -------------------------------------------------
+    if (parser.isSet(diffOpt) || parser.isSet(diffToOpt)) {
+        if (!parser.isSet(diffOpt) || !parser.isSet(diffToOpt)) {
+            err << "error: --diff needs both <dir-a> and --diff-to <dir-b>\n";
+            return 1;
+        }
+        const dm::DiffResult d = dm::SnapshotDiff::compare(
+            parser.value(diffOpt), parser.value(diffToOpt));
+        if (!d.error.isEmpty()) {
+            err << "error: " << d.error << "\n";
+            return 1;
+        }
+        err << "diff " << d.stampA << " -> " << d.stampB << "\n";
+        for (const auto& x : d.deltas)
+            err << "  " << x.change << "  " << x.name
+                << (x.note.isEmpty() ? QString() : "  (" + x.note + ")") << "\n";
+        err << d.added << " added, " << d.removed << " removed, " << d.changed
+            << " changed\n";
+        return 0;
     }
 
     // ---- restore mode --------------------------------------------------
