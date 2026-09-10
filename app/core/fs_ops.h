@@ -5,10 +5,16 @@
 // tree; deleting one would wipe the link target. Both are the bug that
 // corrupted gpt-image under the PowerShell restore.
 //
+#include <QByteArray>
 #include <QString>
 #include <QStringList>
 
 namespace dm::fs {
+
+// SHA-256 of a file, or of a directory tree (each file's relative path + its
+// bytes, folded in sorted-path order for a stable result). Reparse points are
+// skipped, never followed. Returns an empty QByteArray on any read error.
+QByteArray sha256Of(const QString& path);
 
 struct CopyStats {
     bool ok = true;

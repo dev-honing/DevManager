@@ -13,6 +13,7 @@
 #include "snapshot/snapshot_executor.h"
 #include "snapshot/snapshot_index.h"
 #include "snapshot/snapshot_preview.h"
+#include "snapshot/snapshot_verify.h"
 
 #include <QCoreApplication>
 #include <QCommandLineParser>
@@ -40,17 +41,36 @@ int main(int argc, char** argv)
                                              "(prints the plan unless --apply).",
                                   "snapshot-dir");
     QCommandLineOption applyOpt("apply", "With --restore: actually apply it.");
+    QCommandLineOption verifyOpt("verify", "Re-hash a snapshot dir and check it "
+                                           "against its manifest.",
+                                 "snapshot-dir");
     parser.addOption(outOpt);
     parser.addOption(rootOpt);
     parser.addOption(snapOpt);
     parser.addOption(restoreOpt);
     parser.addOption(applyOpt);
+    parser.addOption(verifyOpt);
     parser.process(app);
 
     if (parser.isSet(rootOpt))
         QDir::setCurrent(parser.value(rootOpt));
 
     QTextStream err(stderr);
+
+    // ---- verify mode -------------------------------------------------
+    if (parser.isSet(verifyOpt)) {
+        const dm::VerifyResult v =
+            dm::SnapshotVerify::check(parser.value(verifyOpt));
+        if (!v.error.isEmpty()) {
+            err << "error: " << v.error << "\n";
+            return 1;
+        }
+        for (const auto& c : v.components)
+            err << "  " << c.status << "  " << c.name << "\n";
+        err << (v.ok ? "OK  " : "BAD ") << v.okCount << " ok, " << v.badCount
+            << " bad, " << v.skippedCount << " skipped\n";
+        return v.ok ? 0 : 2;
+    }
 
     // ---- restore mode --------------------------------------------------
     if (parser.isSet(restoreOpt)) {
