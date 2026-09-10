@@ -7,6 +7,7 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QCheckBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -69,11 +70,17 @@ SnapshotPage::SnapshotPage(QWidget* parent) : QWidget(parent)
     m_createBtn->setCursor(Qt::PointingHandCursor);
     connect(m_createBtn, &QPushButton::clicked, this, &SnapshotPage::createSnapshot);
 
+    m_stopFirst = new QCheckBox("stop running services first");
+    m_stopFirst->setToolTip("Stop the services holding backup files open, take a "
+                            "consistent snapshot, then start them again.");
+    m_stopFirst->hide();
+
     m_summary = new QLabel("Run a dry check to see the plan.");
     m_summary->setStyleSheet(QString("color:%1;").arg(Color::Muted));
 
     bar->addWidget(m_dryBtn);
     bar->addWidget(m_createBtn);
+    bar->addWidget(m_stopFirst);
     bar->addStretch(1);
     bar->addWidget(m_summary);
     lay->addLayout(bar);
@@ -151,8 +158,10 @@ void SnapshotPage::render(const SnapshotPreview& pv)
         m_blockers->setText("Running services: " + pv.serviceBlockers.join(", ")
                             + ".  Stop them for a migration-grade (consistent) snapshot.");
         m_blockers->show();
+        m_stopFirst->show();
     } else {
         m_blockers->hide();
+        m_stopFirst->hide();
     }
 
     m_summary->setText(
@@ -196,13 +205,19 @@ void SnapshotPage::createSnapshot()
         return;
 
     const bool live = !m_preview.serviceBlockers.isEmpty();
+    const bool stopFirst = live && m_stopFirst->isChecked();
     QString text = QString("Write a snapshot under\n%1\n\n"
                            "Reads your configured dirs; writes only there. "
                            "Nothing else is touched.")
                        .arg(m_backupsDir);
-    if (live)
-        text += QString("\n\nHeadroom / OmniRoute are running — the snapshot will "
-                        "be marked non-consistent (live).");
+    if (stopFirst)
+        text += QString("\n\n%1 will be stopped, the snapshot taken, then "
+                        "started again.")
+                    .arg(m_preview.serviceBlockers.join(" / "));
+    else if (live)
+        text += QString("\n\n%1 running — the snapshot will be marked "
+                        "non-consistent (live).")
+                    .arg(m_preview.serviceBlockers.join(" / "));
 
     if (QMessageBox::question(this, "Create Snapshot", text,
                               QMessageBox::Yes | QMessageBox::Cancel,
@@ -218,27 +233,42 @@ void SnapshotPage::createSnapshot()
 
     const SnapshotPreview pv = m_preview;
     const QString dest = m_backupsDir;
+    const auto services = m_services;
+    m_serviceNotes.clear();
 
     // build a fresh inventory json to store alongside the manifest
     const QJsonObject inv = EnvironmentScanner::scan().toJson();
 
-    m_execWatcher.setFuture(QtConcurrent::run([pv, dest, inv, this] {
-        return SnapshotExecutor::run(
-            pv, dest, inv, [this](int done, int total, const QString& label) {
-                QMetaObject::invokeMethod(
-                    this,
-                    [this, done, total, label] {
-                        if (total > 0) {
-                            m_progress->setRange(0, total);
-                            m_progress->setValue(done);
-                        }
-                        m_progress->setFormat(QString("%1  (%2/%3)")
-                                                  .arg(label)
-                                                  .arg(done)
-                                                  .arg(total));
-                    },
-                    Qt::QueuedConnection);
-            });
+    m_execWatcher.setFuture(QtConcurrent::run([pv, dest, inv, services, stopFirst, this] {
+        auto progress = [this](int done, int total, const QString& label) {
+            QMetaObject::invokeMethod(
+                this,
+                [this, done, total, label] {
+                    if (total > 0) {
+                        m_progress->setRange(0, total);
+                        m_progress->setValue(done);
+                    }
+                    m_progress->setFormat(
+                        QString("%1  (%2/%3)").arg(label).arg(done).arg(total));
+                },
+                Qt::QueuedConnection);
+        };
+
+        if (stopFirst) {
+            const ConsistentSnapshotResult cr =
+                SnapshotCoordinator::runConsistent(services, dest, inv, progress);
+            QStringList notes;
+            if (!cr.stopped.isEmpty())
+                notes << "stopped " + cr.stopped.join(", ");
+            if (!cr.restarted.isEmpty())
+                notes << "restarted " + cr.restarted.join(", ");
+            notes += cr.serviceErrors;
+            QMetaObject::invokeMethod(
+                this, [this, notes] { m_serviceNotes = notes; },
+                Qt::QueuedConnection);
+            return cr.snapshot;
+        }
+        return SnapshotExecutor::run(pv, dest, inv, progress);
     }));
 }
 
@@ -254,6 +284,8 @@ void SnapshotPage::onCreated(const SnapshotResult& r)
                                .arg(r.copied)
                                .arg(humanBytes(r.bytes)));
         QString detail = "Snapshot: " + r.snapshotDir;
+        if (!m_serviceNotes.isEmpty())
+            detail = "Services: " + m_serviceNotes.join("; ") + "\n\n" + detail;
         if (!r.linkNotes.isEmpty())
             detail += "\n\nLinks recorded (not copied):\n  "
                       + r.linkNotes.mid(0, 12).join("\n  ");

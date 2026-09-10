@@ -40,9 +40,11 @@ ScanConfig ScanConfig::defaults()
           {"install", "stop", "--profile", "init-user"},
           {"install", "start", "--profile", "init-user"},
           {"install", "restart", "--profile", "init-user"},
-          false}},
+          false},
+         true},
         {"omniroute", "OmniRoute", 20128, {}, false,
-         {"omniroute", {"status"}, {"stop"}, {"serve"}, {"restart"}, true}},
+         {"omniroute", {"status"}, {"stop"}, {"serve"}, {"restart"}, true},
+         true},
         {"ollama", "Ollama", 11434, {}, false, {}},
         {"docker", "Docker", 0, {"docker", "version", "--format", "{{.Server.Version}}"}, false, {}},
         {"wsl", "WSL", 0, {}, true, {}},
@@ -199,6 +201,7 @@ ScanConfig ScanConfig::load()
                 s.lifecycle.restartArgs = jsonStrings(lc.value("restart"));
                 s.lifecycle.startDetached = lc.value("startDetached").toBool(true);
             }
+            s.snapshotBlocker = o.value("snapshotBlocker").toBool(false);
             if (!s.id.isEmpty())
                 c.services << s;
         }

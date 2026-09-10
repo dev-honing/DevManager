@@ -149,9 +149,12 @@ SnapshotPreview SnapshotPlanner::compute(const QList<ServiceState>& services)
                          return a.rootId + a.name < b.rootId + b.name;
                      });
 
+    QStringList blockerIds;
+    for (const ServiceSpec& s : cfg.services)
+        if (s.snapshotBlocker)
+            blockerIds << s.id;
     for (const ServiceState& s : services)
-        if (s.level == ServiceState::Running
-            && (s.id == "headroom" || s.id == "omniroute"))
+        if (s.level == ServiceState::Running && blockerIds.contains(s.id))
             pv.serviceBlockers << s.name;
 
     return pv;
