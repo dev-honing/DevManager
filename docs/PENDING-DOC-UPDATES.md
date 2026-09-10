@@ -126,7 +126,7 @@ generated, move the covered entries into that revision and clear them here.
 
 ### 7. P11 — Docker track (images + per-project containers + devcontainer + host profiles)
 - Commits: `434c40b` (P11.1), `5eac40c` (P11.2/11.3), `11319d5` (P11.4),
-  merge `<fill on merge>` (branch `feat/docker-track`)
+  merge ee65f48
 - **P11.1 layered images** — `docker/base|cpp|nextjs/Dockerfile`:
   `ai-dev-base:0.1` (`node:22-slim` + Claude Code + Codex + git + ripgrep +
   tini, unprivileged `node` user, `/workspace`); `ai-dev-cpp:0.1` (+ gcc/cmake/
