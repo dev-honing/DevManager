@@ -18,20 +18,20 @@ ScanConfig ScanConfig::defaults()
 {
     ScanConfig c;
     c.tools = {
-        {"docker", "containers", {"--version"}, {}},
-        {"node", "runtimes", {"--version"}, {}},
-        {"npm", "runtimes", {"--version"}, {}},
-        {"python", "runtimes", {"--version"}, {}},
-        {"cmake", "build", {"--version"}, {}},
-        {"git", "build", {"--version"}, {}},
-        {"claude", "ai", {"--version"}, {}},
-        {"codex", "ai", {"--version"}, {}},
-        {"gemini", "ai", {"--version"}, {}},
-        {"cursor-agent", "ai", {"--version"}, {}},
-        {"aider", "ai", {"--version"}, {}},
-        {"ollama", "ai", {"--version"}, {}},
-        {"headroom", "ai", {"--version"}, {"~/.local/bin/headroom.exe"}},
-        {"omniroute", "ai", {"--version"}, {}},
+        {"docker", "containers", {"--version"}, {}, "winget install --id Docker.DockerDesktop -e"},
+        {"node", "runtimes", {"--version"}, {}, "winget install --id OpenJS.NodeJS.LTS -e"},
+        {"npm", "runtimes", {"--version"}, {}, ""},
+        {"python", "runtimes", {"--version"}, {}, "winget install --id Python.Python.3.12 -e"},
+        {"cmake", "build", {"--version"}, {}, "winget install --id Kitware.CMake -e"},
+        {"git", "build", {"--version"}, {}, "winget install --id Git.Git -e"},
+        {"claude", "ai", {"--version"}, {}, "npm install -g @anthropic-ai/claude-code"},
+        {"codex", "ai", {"--version"}, {}, "npm install -g @openai/codex"},
+        {"gemini", "ai", {"--version"}, {}, "npm install -g @google/gemini-cli"},
+        {"cursor-agent", "ai", {"--version"}, {}, ""},
+        {"aider", "ai", {"--version"}, {}, "python -m pip install aider-install && aider-install"},
+        {"ollama", "ai", {"--version"}, {}, "winget install --id Ollama.Ollama -e"},
+        {"headroom", "ai", {"--version"}, {"~/.local/bin/headroom.exe"}, ""},
+        {"omniroute", "ai", {"--version"}, {}, ""},
     };
     c.services = {
         {"headroom", "Headroom", 8787, {}, false,
@@ -178,6 +178,7 @@ ScanConfig ScanConfig::load()
                                 ? jsonStrings(o.value("versionArgs"))
                                 : QStringList{"--version"};
             t.fallbackPaths = jsonStrings(o.value("fallbackPaths"));
+            t.install = o.value("install").toString();
             if (!t.id.isEmpty())
                 c.tools << t;
         }

@@ -74,6 +74,25 @@ generated, move the covered entries into that revision and clear them here.
   (add `tst_snapshot_retention`, 10 suites), §12.2 roadmap (P10 잔여 → 압축
   아카이브만 남음; 보존 정책 done).
 
+### 5. P9 잔여 — New-PC bootstrap (`Bootstrap`, `--bootstrap`)
+- Commit: `<fill on merge>` (branch `feat/bootstrap`)
+- New optional `ToolSpec.install` field (`tools[].install` in scan.json) — a
+  shell command that installs the tool. Defaults + `config/scan.json` seeded
+  with winget / npm / pip hints for the common tools.
+- `app/core/bootstrap.{h,cpp}` — `Bootstrap::plan()`: runs `HealthCheck`, and
+  for every tool that came back `fail` emits its `install` command (or a
+  `# … install manually` line when none is configured). Read-only — never runs
+  anything.
+- CLI: `devmanager-scan --bootstrap` — prints the commands to stdout for the
+  user to review and run; a one-line summary (`N missing, M with a hint`) to
+  stderr.
+- Real run here: `gemini` / `aider` get commands, `cursor-agent` flagged manual.
+- **Docx sections to touch:** §2.1 module table (add `bootstrap`), §2.3 CLI
+  (add `--bootstrap`), §3 config (`tools[].install`), §9 배포 (bootstrap is the
+  new-PC install step), §11 tests (add `tst_bootstrap`, 11 suites), §12.2
+  roadmap (P9 잔여 → bootstrap done; only "full new-PC flow automation" narrative
+  remains), §13 (Host Bootstrap PowerShell row → superseded by `--bootstrap`).
+
 ---
 
 ## How to use this file
