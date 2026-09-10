@@ -14,6 +14,7 @@ add_library(devmanager_core STATIC
     core/process_runner.cpp
     core/path_util.cpp
     core/json_io.cpp
+    core/fs_ops.cpp
     core/config/scan_config.cpp
     core/scan/skill_scanner.cpp
     core/scan/env_scanner.cpp
@@ -23,6 +24,7 @@ add_library(devmanager_core STATIC
     core/snapshot/snapshot_preview.cpp
     core/snapshot/restore_preview.cpp
     core/snapshot/snapshot_executor.cpp
+    core/snapshot/restore_executor.cpp
 )
 target_include_directories(devmanager_core PUBLIC core)
 target_link_libraries(devmanager_core PUBLIC Qt6::Core Qt6::Network)
@@ -75,4 +77,8 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_service_lifecycle tests/tst_service_lifecycle.cpp)
     target_link_libraries(tst_service_lifecycle PRIVATE devmanager_core Qt6::Test)
     add_test(NAME service_lifecycle COMMAND tst_service_lifecycle)
+
+    add_executable(tst_restore_executor tests/tst_restore_executor.cpp)
+    target_link_libraries(tst_restore_executor PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME restore_executor COMMAND tst_restore_executor)
 endif()

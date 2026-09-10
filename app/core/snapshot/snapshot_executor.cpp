@@ -1,53 +1,16 @@
 #include "snapshot/snapshot_executor.h"
 
+#include "fs_ops.h"
 #include "json_io.h"
 #include "path_util.h"
 
 #include <QDateTime>
 #include <QDir>
-#include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QProcessEnvironment>
 
 namespace dm {
-
-// Recursive copy that NEVER follows a reparse point (junction/symlink):
-// those are recorded and skipped, so a snapshot can't inflate a link into a
-// full copy (the bug that corrupted gpt-image under the PowerShell restore).
-static bool copyEntry(const QString& src, const QString& dst, qint64* bytes,
-                      int* files, QStringList* errors, QStringList* skippedLinks)
-{
-    const QFileInfo fi(src);
-
-    if (fi.isSymLink() || fi.isJunction()) {
-        *skippedLinks << src;
-        return true;
-    }
-
-    if (fi.isFile()) {
-        QDir().mkpath(QFileInfo(dst).absolutePath());
-        if (QFile::exists(dst))
-            QFile::remove(dst);
-        if (!QFile::copy(src, dst)) {
-            *errors << "copy failed: " + QDir::toNativeSeparators(src);
-            return false;
-        }
-        *bytes += fi.size();
-        *files += 1;
-        return true;
-    }
-
-    QDir().mkpath(dst);
-    bool ok = true;
-    const auto entries = QDir(src).entryInfoList(
-        QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
-    for (const QFileInfo& e : entries) {
-        ok &= copyEntry(e.absoluteFilePath(), dst + "/" + e.fileName(), bytes,
-                        files, errors, skippedLinks);
-    }
-    return ok;
-}
 
 SnapshotResult SnapshotExecutor::run(const SnapshotPreview& preview,
                                      const QString& destBaseDir,
@@ -97,25 +60,21 @@ SnapshotResult SnapshotExecutor::run(const SnapshotPreview& preview,
             c.insert("copied", false);
             res.linkNotes << rel + "  ->  " + a.linkTarget;
         } else {
-            qint64 bytes = 0;
-            int files = 0;
-            QStringList errs, skipped;
-            const bool ok = copyEntry(a.path, snapDir + "/" + rel, &bytes, &files,
-                                      &errs, &skipped);
+            const fs::CopyStats cs = fs::copyTree(a.path, snapDir + "/" + rel);
             c.insert("type", QFileInfo(a.path).isDir() ? "directory" : "file");
-            c.insert("copied", ok);
-            c.insert("sizeBytes", static_cast<double>(bytes));
-            c.insert("fileCount", files);
-            for (const QString& s : skipped)
+            c.insert("copied", cs.ok);
+            c.insert("sizeBytes", static_cast<double>(cs.bytes));
+            c.insert("fileCount", cs.files);
+            for (const QString& s : cs.skippedLinks)
                 res.linkNotes << "skipped link inside " + rel + ": "
                                      + QDir::toNativeSeparators(s);
-            if (ok) {
+            if (cs.ok) {
                 res.copied += 1;
-                res.bytes += bytes;
+                res.bytes += cs.bytes;
             } else {
                 res.failed += 1;
-                res.errors += errs;
-                c.insert("error", errs.join("; "));
+                res.errors += cs.errors;
+                c.insert("error", cs.errors.join("; "));
             }
         }
         components.append(c);

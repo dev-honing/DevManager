@@ -96,6 +96,9 @@ void MainWindow::buildUi()
         m_rightPanel->setSnapshots(SnapshotIndex::list(m_backupsDir));
         m_restorePage->setContext(m_backupsDir, m_lastServices);
     });
+    connect(m_restorePage, &RestorePage::restoreApplied, this, [this] {
+        m_controller.scanEnvironment();
+    });
     m_stack->addWidget(m_snapshotPage);   // 5
     m_stack->addWidget(m_restorePage);    // 6
     m_stack->addWidget(new PlaceholderPage(

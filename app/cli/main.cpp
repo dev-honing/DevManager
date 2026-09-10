@@ -8,6 +8,8 @@
 #include "json_io.h"
 #include "scan/env_scanner.h"
 #include "service/service_probe.h"
+#include "snapshot/restore_executor.h"
+#include "snapshot/restore_preview.h"
 #include "snapshot/snapshot_executor.h"
 #include "snapshot/snapshot_index.h"
 #include "snapshot/snapshot_preview.h"
@@ -34,15 +36,61 @@ int main(int argc, char** argv)
                               "path");
     QCommandLineOption snapOpt("snapshot",
                                "Also create a snapshot under <root>/backups/.");
+    QCommandLineOption restoreOpt("restore", "Restore from this snapshot dir "
+                                             "(prints the plan unless --apply).",
+                                  "snapshot-dir");
+    QCommandLineOption applyOpt("apply", "With --restore: actually apply it.");
     parser.addOption(outOpt);
     parser.addOption(rootOpt);
     parser.addOption(snapOpt);
+    parser.addOption(restoreOpt);
+    parser.addOption(applyOpt);
     parser.process(app);
 
     if (parser.isSet(rootOpt))
         QDir::setCurrent(parser.value(rootOpt));
 
     QTextStream err(stderr);
+
+    // ---- restore mode --------------------------------------------------
+    if (parser.isSet(restoreOpt)) {
+        const QString dir = parser.value(restoreOpt);
+        if (!parser.isSet(applyOpt)) {
+            const dm::RestorePreview pv =
+                dm::RestorePlanner::compute(dir, dm::ServiceProbe::probeAll());
+            if (!pv.valid) {
+                err << "error: " << pv.error << "\n";
+                return 1;
+            }
+            err << "restore plan for " << dir << "\n"
+                << "  remap: " << pv.sourceUserProfile << " -> "
+                << pv.currentUserProfile << "\n"
+                << "  targets: " << pv.targets.size() << "\n";
+            for (const auto& t : pv.targets)
+                err << "    " << (t.included ? "[x] " : "[ ] ") << t.name << "  -> "
+                    << t.destPath << (t.existsNow ? "  (move aside)" : "") << "\n";
+            for (const QString& w : pv.linkWarnings)
+                err << "  link warn: " << w << "\n";
+            for (const QString& b : pv.serviceBlockers)
+                err << "  blocker: " << b << " running\n";
+            err << "\n(dry run — pass --apply to execute)\n";
+            return 0;
+        }
+        err << "APPLYING restore from " << dir << "\n";
+        const dm::RestoreResult r = dm::RestoreExecutor::run(
+            dir, {}, [&err](dm::RestoreState s, const QString& d) {
+                err << "  " << dm::restoreStateName(s)
+                    << (d.isEmpty() ? QString() : "  " + d) << "\n";
+            });
+        err << (r.ok ? "OK" : "FAILED") << " state=" << dm::restoreStateName(r.state)
+            << " restored=" << r.restored << "\n";
+        for (const QString& l : r.linkResults) err << "  link: " << l << "\n";
+        for (const QString& e : r.errors) err << "  err : " << e << "\n";
+        for (const QString& e : r.rollbackErrors) err << "  rb  : " << e << "\n";
+        err << "  pre-restore: " << r.preRestoreDir << "\n";
+        return r.ok ? 0 : 2;
+    }
+
     err << "scanning environment (read-only)...\n";
 
     const dm::EnvironmentInventory inv = dm::EnvironmentScanner::scan();
