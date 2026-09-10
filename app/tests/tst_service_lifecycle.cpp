@@ -10,6 +10,7 @@ private slots:
     void runsMappedCommandAndCapturesOutput();
     void reportsMissingLifecycle();
     void startDetachedReturnsImmediately();
+    void surfacesStderrReasonOnFailure();
 };
 
 static ServiceSpec fakeSpec()
@@ -61,6 +62,20 @@ void TstServiceLifecycle::startDetachedReturnsImmediately()
     const LifecycleResult r = ServiceLifecycle::run(s, LifecycleOp::Start);
     QVERIFY(r.ok);
     QVERIFY(t.elapsed() < 3000);
+}
+
+void TstServiceLifecycle::surfacesStderrReasonOnFailure()
+{
+#ifndef Q_OS_WIN
+    QSKIP("cmd-based fixture is Windows-only");
+#endif
+    // a command that prints a reason to stderr and exits non-zero -- the
+    // reason must reach LifecycleResult.error, not just "exit 1"
+    ServiceSpec s = fakeSpec();
+    s.lifecycle.stopArgs = {"/c", "echo not-supported-here 1>&2 & exit /b 1"};
+    const LifecycleResult r = ServiceLifecycle::run(s, LifecycleOp::Stop);
+    QVERIFY(!r.ok);
+    QVERIFY2(r.error.contains("not-supported-here"), r.error.toUtf8());
 }
 
 QTEST_MAIN(TstServiceLifecycle)

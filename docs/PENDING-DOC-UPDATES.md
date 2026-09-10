@@ -93,6 +93,37 @@ generated, move the covered entries into that revision and clear them here.
   roadmap (P9 잔여 → bootstrap done; only "full new-PC flow automation" narrative
   remains), §13 (Host Bootstrap PowerShell row → superseded by `--bootstrap`).
 
+### 6. P4 잔여 — Service lifecycle real-environment verification
+- Commits: `<fill on merge>` (branch `feat/service-cli`)
+- New CLI surface: `devmanager-scan --service <id> --service-op status|stop|start|restart`
+  (`ServiceLifecycle` had only a GUI + coordinator entry point before).
+- Code fix: `LifecycleResult.error` now surfaces the process **stderr** on
+  failure — previously it showed only `exit N` and the real reason was lost.
+  Test: `tst_service_lifecycle::surfacesStderrReasonOnFailure`.
+- **Real-env results (2026-09-11):**
+  - `status` — real Headroom + real OmniRoute → exit 0, correct output. ✅
+  - OmniRoute `start` → `stop` — full cycle verified: `omniroute serve`
+    (detached) bound port 20128; `omniroute stop` killed the server; port
+    closed; environment restored to pre-test (stopped). ✅
+  - Headroom `stop` / `start` / `restart` — **fail, and it is not a DevManager
+    bug**: this machine's `init-user` profile uses `persistent-task` (Windows
+    Scheduled Task) scheduling, and Headroom itself rejects
+    `install stop|start|restart` for task deployments ("not supported for task
+    deployments"). Every failed command was a clean no-op — Headroom stayed
+    running, port 8787 open, state unchanged.
+  - Config finding recorded in `config/scan.json` (`_comment` on the headroom
+    service): for a task deployment, point stop/start/restart at
+    `schtasks /end|/run /tn headroom-<profile>-startup`. Left as-is because the
+    right command is deployment-specific and the lifecycle block is
+    user-editable.
+- **Docx sections to touch:** §2.3 CLI (add `--service` / `--service-op`),
+  §6 Service Lifecycle (add: real-env — status both services ✅, OmniRoute
+  start/stop cycle ✅, Headroom task-deployment caveat; error now carries
+  stderr), §11 tests (lifecycle suite 5→6 cases), §12.1 roadmap (P4 → done:
+  mechanics + status + one full start/stop cycle verified; Headroom
+  task-deployment control is a config choice, not a code gap), §14 주의사항
+  (Headroom persistent-task caveat).
+
 ---
 
 ## How to use this file
