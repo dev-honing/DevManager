@@ -16,6 +16,7 @@ add_library(devmanager_core STATIC
     core/json_io.cpp
     core/fs_ops.cpp
     core/health_check.cpp
+    core/bootstrap.cpp
     core/config/scan_config.cpp
     core/scan/skill_scanner.cpp
     core/scan/env_scanner.cpp
@@ -111,6 +112,10 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_snapshot_retention tests/tst_snapshot_retention.cpp)
     target_link_libraries(tst_snapshot_retention PRIVATE devmanager_core Qt6::Test)
     add_test(NAME snapshot_retention COMMAND tst_snapshot_retention)
+
+    add_executable(tst_bootstrap tests/tst_bootstrap.cpp)
+    target_link_libraries(tst_bootstrap PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME bootstrap COMMAND tst_bootstrap)
 endif()
 
 # ---- install: a self-contained folder (see deploy.bat) ----

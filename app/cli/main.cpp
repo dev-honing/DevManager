@@ -5,6 +5,7 @@
 // --snapshot: also writes a real snapshot under <root>/backups/<stamp>/
 //             (reads the configured dirs, writes only there).
 //
+#include "bootstrap.h"
 #include "health_check.h"
 #include "json_io.h"
 #include "scan/env_scanner.h"
@@ -59,6 +60,9 @@ int main(int argc, char** argv)
                                      "dir");
     QCommandLineOption healthOpt("health", "Check configured tools / backup roots / "
                                            "services are ready (read-only).");
+    QCommandLineOption bootstrapOpt("bootstrap", "Print install commands for the "
+                                                 "configured tools that are missing "
+                                                 "(does not run them).");
     QCommandLineOption pruneOpt("prune", "Show which snapshots retention would drop "
                                          "(add --apply to delete them).");
     QCommandLineOption keepLastOpt("keep-last", "prune: keep the N newest snapshots.",
@@ -78,6 +82,7 @@ int main(int argc, char** argv)
     parser.addOption(unbundleOpt);
     parser.addOption(unbundleOutOpt);
     parser.addOption(healthOpt);
+    parser.addOption(bootstrapOpt);
     parser.addOption(pruneOpt);
     parser.addOption(keepLastOpt);
     parser.addOption(keepDaysOpt);
@@ -97,6 +102,23 @@ int main(int argc, char** argv)
         err << (h.ok ? "READY " : "NOT READY ") << h.okCount << " ok, "
             << h.warnCount << " warn, " << h.failCount << " fail\n";
         return h.ok ? 0 : 2;
+    }
+
+    // ---- bootstrap: print install commands for missing tools ----------
+    if (parser.isSet(bootstrapOpt)) {
+        const dm::BootstrapPlan bp = dm::Bootstrap::plan();
+        QTextStream out(stdout);
+        out << "# install commands for missing tools -- review before running\n";
+        if (bp.missing == 0)
+            out << "# (nothing missing)\n";
+        for (const dm::BootstrapStep& s : bp.steps) {
+            if (s.haveHint)
+                out << s.command << "\n";
+            else
+                out << "# " << s.tool << ": no install hint in config -- install manually\n";
+        }
+        err << bp.missing << " missing, " << bp.withHint << " with an install hint\n";
+        return 0;
     }
 
     // ---- prune (retention) ---------------------------------------------

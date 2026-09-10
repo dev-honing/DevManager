@@ -17,6 +17,7 @@ struct ToolSpec {
     QString category;           // "ai" | "runtimes" | "build" | "containers" | ...
     QStringList versionArgs{"--version"};
     QStringList fallbackPaths;  // absolute/`~`-relative, tried if not on PATH
+    QString install;            // shell command to install it (bootstrap hint), "" = none
 };
 
 struct ServiceLifecycleSpec {
