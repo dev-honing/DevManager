@@ -5,12 +5,19 @@
 
 #include <QtConcurrent>
 
+#include <QDir>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QMessageBox>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QTableWidget>
 #include <QVBoxLayout>
+
+#include "json_io.h"
+#include "scan/env_scanner.h"
 
 namespace dm {
 
@@ -58,7 +65,9 @@ SnapshotPage::SnapshotPage(QWidget* parent) : QWidget(parent)
     m_createBtn = new QPushButton("Create Snapshot");
     m_createBtn->setObjectName("secondaryBtn");
     m_createBtn->setEnabled(false);
-    m_createBtn->setToolTip("Snapshot execution is not implemented yet — dry check only.");
+    m_createBtn->setToolTip("Run a dry check first");
+    m_createBtn->setCursor(Qt::PointingHandCursor);
+    connect(m_createBtn, &QPushButton::clicked, this, &SnapshotPage::createSnapshot);
 
     m_summary = new QLabel("Run a dry check to see the plan.");
     m_summary->setStyleSheet(QString("color:%1;").arg(Color::Muted));
@@ -68,6 +77,11 @@ SnapshotPage::SnapshotPage(QWidget* parent) : QWidget(parent)
     bar->addStretch(1);
     bar->addWidget(m_summary);
     lay->addLayout(bar);
+
+    m_progress = new QProgressBar;
+    m_progress->setTextVisible(true);
+    m_progress->hide();
+    lay->addWidget(m_progress);
 
     m_blockers = new QLabel;
     m_blockers->setWordWrap(true);
@@ -100,12 +114,16 @@ SnapshotPage::SnapshotPage(QWidget* parent) : QWidget(parent)
 
     connect(&m_watcher, &QFutureWatcher<SnapshotPreview>::finished, this,
             [this] { render(m_watcher.result()); });
+    connect(&m_execWatcher, &QFutureWatcher<SnapshotResult>::finished, this,
+            [this] { onCreated(m_execWatcher.result()); });
 }
 
 void SnapshotPage::setServices(const QList<ServiceState>& services)
 {
     m_services = services;
 }
+
+void SnapshotPage::setBackupsDir(const QString& dir) { m_backupsDir = dir; }
 
 void SnapshotPage::runDryCheck()
 {
@@ -121,8 +139,13 @@ void SnapshotPage::runDryCheck()
 
 void SnapshotPage::render(const SnapshotPreview& pv)
 {
+    m_preview = pv;
     m_dryBtn->setEnabled(true);
     m_dryBtn->setText("  Re-run Dry Check");
+    m_createBtn->setEnabled(pv.valid && pv.backupFiles > 0 && !m_backupsDir.isEmpty());
+    m_createBtn->setToolTip(m_backupsDir.isEmpty()
+                                ? "No backups/ directory located"
+                                : "Write a snapshot to " + m_backupsDir);
 
     if (!pv.serviceBlockers.isEmpty()) {
         m_blockers->setText("Running services: " + pv.serviceBlockers.join(", ")
@@ -164,6 +187,85 @@ void SnapshotPage::render(const SnapshotPreview& pv)
         files->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
         files->setForeground(QColor(Color::Muted));
         m_table->setItem(i, 4, files);
+    }
+}
+
+void SnapshotPage::createSnapshot()
+{
+    if (m_execWatcher.isRunning() || !m_preview.valid || m_backupsDir.isEmpty())
+        return;
+
+    const bool live = !m_preview.serviceBlockers.isEmpty();
+    QString text = QString("Write a snapshot under\n%1\n\n"
+                           "Reads your configured dirs; writes only there. "
+                           "Nothing else is touched.")
+                       .arg(m_backupsDir);
+    if (live)
+        text += QString("\n\nHeadroom / OmniRoute are running — the snapshot will "
+                        "be marked non-consistent (live).");
+
+    if (QMessageBox::question(this, "Create Snapshot", text,
+                              QMessageBox::Yes | QMessageBox::Cancel,
+                              QMessageBox::Cancel)
+        != QMessageBox::Yes)
+        return;
+
+    m_createBtn->setEnabled(false);
+    m_dryBtn->setEnabled(false);
+    m_progress->setRange(0, 0);          // busy until first progress tick
+    m_progress->setFormat("preparing...");
+    m_progress->show();
+
+    const SnapshotPreview pv = m_preview;
+    const QString dest = m_backupsDir;
+
+    // build a fresh inventory json to store alongside the manifest
+    const QJsonObject inv = EnvironmentScanner::scan().toJson();
+
+    m_execWatcher.setFuture(QtConcurrent::run([pv, dest, inv, this] {
+        return SnapshotExecutor::run(
+            pv, dest, inv, [this](int done, int total, const QString& label) {
+                QMetaObject::invokeMethod(
+                    this,
+                    [this, done, total, label] {
+                        if (total > 0) {
+                            m_progress->setRange(0, total);
+                            m_progress->setValue(done);
+                        }
+                        m_progress->setFormat(QString("%1  (%2/%3)")
+                                                  .arg(label)
+                                                  .arg(done)
+                                                  .arg(total));
+                    },
+                    Qt::QueuedConnection);
+            });
+    }));
+}
+
+void SnapshotPage::onCreated(const SnapshotResult& r)
+{
+    m_progress->hide();
+    m_dryBtn->setEnabled(true);
+    m_createBtn->setEnabled(true);
+
+    if (r.ok) {
+        m_summary->setText(QString("snapshot written: %1  ·  %2 items, %3")
+                               .arg(QFileInfo(r.snapshotDir).fileName())
+                               .arg(r.copied)
+                               .arg(humanBytes(r.bytes)));
+        QString detail = "Snapshot: " + r.snapshotDir;
+        if (!r.linkNotes.isEmpty())
+            detail += "\n\nLinks recorded (not copied):\n  "
+                      + r.linkNotes.mid(0, 12).join("\n  ");
+        QMessageBox::information(this, "Snapshot created", detail);
+        emit snapshotCreated();
+    } else {
+        QMessageBox::warning(
+            this, "Snapshot failed",
+            QString("%1 of %2 items failed.\n\n%3")
+                .arg(r.failed)
+                .arg(r.copied + r.failed)
+                .arg(r.errors.mid(0, 10).join("\n")));
     }
 }
 

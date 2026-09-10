@@ -21,6 +21,7 @@ add_library(devmanager_core STATIC
     core/snapshot/snapshot_index.cpp
     core/snapshot/snapshot_preview.cpp
     core/snapshot/restore_preview.cpp
+    core/snapshot/snapshot_executor.cpp
 )
 target_include_directories(devmanager_core PUBLIC core)
 target_link_libraries(devmanager_core PUBLIC Qt6::Core Qt6::Network)
@@ -65,4 +66,8 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_skill_scanner tests/tst_skill_scanner.cpp)
     target_link_libraries(tst_skill_scanner PRIVATE devmanager_core Qt6::Test)
     add_test(NAME skill_scanner COMMAND tst_skill_scanner)
+
+    add_executable(tst_snapshot_executor tests/tst_snapshot_executor.cpp)
+    target_link_libraries(tst_snapshot_executor PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME snapshot_executor COMMAND tst_snapshot_executor)
 endif()

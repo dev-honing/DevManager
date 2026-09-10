@@ -6,6 +6,7 @@
 // defaults() as the fallback when the file is absent.
 //
 #include <QList>
+#include <QMap>
 #include <QString>
 #include <QStringList>
 
@@ -33,6 +34,14 @@ struct PackageManagerSpec {
     QString parseMode;          // "npm-deps" | "pip-list"
 };
 
+// One snapshot-policy rule. First match wins (see SnapshotPlanner).
+struct SnapshotRule {
+    QString root;               // "" = any backup root, else its dir name (".claude")
+    QString name;               // "" = any top-level entry, else exact match
+    QString policy;             // "backup" | "inventory-only" | "regenerate" | "exclude"
+    QString reason;
+};
+
 struct ScanConfig {
     QList<ToolSpec> tools;
     QList<ServiceSpec> services;
@@ -41,6 +50,8 @@ struct ScanConfig {
     QStringList envSecret;       // name substrings that force value masking
     QStringList qtSearchPaths;   // dirs scanned for `\d+\.\d+` version subfolders
     QStringList backupRoots;     // dirs a snapshot would consider (`~`-relative ok)
+    QList<SnapshotRule> snapshotRules;              // per-entry policy, first match wins
+    QMap<QString, QString> snapshotRootDefaults;    // rootId -> policy; "*" = catch-all
     QString sourcePath;          // file it was loaded from; empty => built-in defaults
 
     static ScanConfig defaults();

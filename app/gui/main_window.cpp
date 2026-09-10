@@ -92,6 +92,10 @@ void MainWindow::buildUi()
     m_stack->addWidget(m_envVarsPage);    // 4
     m_snapshotPage = new SnapshotPage;
     m_restorePage = new RestorePage;
+    connect(m_snapshotPage, &SnapshotPage::snapshotCreated, this, [this] {
+        m_rightPanel->setSnapshots(SnapshotIndex::list(m_backupsDir));
+        m_restorePage->setContext(m_backupsDir, m_lastServices);
+    });
     m_stack->addWidget(m_snapshotPage);   // 5
     m_stack->addWidget(m_restorePage);    // 6
     m_stack->addWidget(new PlaceholderPage(
@@ -177,6 +181,7 @@ void MainWindow::onServicesProbed(const QList<ServiceState>& services)
 void MainWindow::refreshMigrationPages()
 {
     m_snapshotPage->setServices(m_lastServices);
+    m_snapshotPage->setBackupsDir(m_backupsDir);
     m_restorePage->setContext(m_backupsDir, m_lastServices);
 }
 

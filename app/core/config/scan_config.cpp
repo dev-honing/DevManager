@@ -53,6 +53,52 @@ ScanConfig ScanConfig::defaults()
     c.qtSearchPaths = {"C:/Qt", "~/Qt", "$QTDIR", "$QT_ROOT", "/opt/Qt"};
     c.backupRoots = {"~/.claude", "~/.codex", "~/.agents", "~/.gemini",
                      "~/.headroom", "~/.omniroute"};
+    c.snapshotRootDefaults = {{".claude", "exclude"},
+                              {".codex", "exclude"},
+                              {".headroom", "exclude"},
+                              {".omniroute", "exclude"},
+                              {"*", "backup"}};
+    c.snapshotRules = {
+        {".claude", "settings.json", "backup", "core config"},
+        {".claude", "CLAUDE.md", "backup", "user rules"},
+        {".claude", ".credentials.json", "exclude", "secret — re-login"},
+        {".claude", "skills", "backup", "user skills"},
+        {".claude", "plugins", "regenerate", "re-install from marketplace"},
+        {".claude", "projects", "inventory-only", "session transcripts"},
+        {".claude", "history.jsonl", "inventory-only", "prompt history"},
+        {".claude", "cache", "exclude", "cache"},
+        {".claude", "file-history", "exclude", "editor undo"},
+        {".claude", "shell-snapshots", "exclude", "runtime"},
+        {".codex", "config.toml", "backup", "core config"},
+        {".codex", "AGENTS.md", "backup", "user rules"},
+        {".codex", "hooks.json", "backup", "config"},
+        {".codex", "auth.json", "exclude", "secret — re-login"},
+        {".codex", "skills", "backup", "user skills"},
+        {".codex", "plugins", "regenerate", "re-install"},
+        {".codex", ".tmp", "exclude", "scratch"},
+        {".codex", ".sandbox-bin", "exclude", "runtime"},
+        {".codex", "sessions", "inventory-only", "session data"},
+        {".codex", "cache", "exclude", "cache"},
+        {".headroom", "deploy", "backup", "deployment definition"},
+        {".headroom", "config", "backup", "config"},
+        {".headroom", "logs", "exclude", "logs"},
+        {".omniroute", ".env", "exclude", "secret — re-login"},
+        {".omniroute", "storage.sqlite", "backup", "routing state"},
+        {".omniroute", "call_logs", "exclude", "logs"},
+        {".omniroute", "db_backups", "exclude", "logs"},
+        {".omniroute", "logs", "exclude", "logs"},
+        // generic hints that apply to any AI tool dir added to backupRoots
+        {"", "logs", "exclude", "logs"},
+        {"", "cache", "exclude", "cache"},
+        {"", ".cache", "exclude", "cache"},
+        {"", "tmp", "exclude", "scratch"},
+        {"", ".tmp", "exclude", "scratch"},
+        {"", "node_modules", "regenerate", "re-install"},
+        {"", "auth.json", "exclude", "secret"},
+        {"", ".env", "exclude", "secret"},
+        {"", "credentials.json", "exclude", "secret"},
+        {"", ".credentials.json", "exclude", "secret"},
+    };
     return c;
 }
 
@@ -161,6 +207,28 @@ ScanConfig ScanConfig::load()
         c.qtSearchPaths = jsonStrings(root.value("qtSearchPaths"));
     if (root.contains("backupRoots"))
         c.backupRoots = jsonStrings(root.value("backupRoots"));
+
+    if (root.contains("snapshot")) {
+        const QJsonObject sn = root.value("snapshot").toObject();
+        if (sn.contains("rootDefaults")) {
+            c.snapshotRootDefaults.clear();
+            const QJsonObject rd = sn.value("rootDefaults").toObject();
+            for (auto it = rd.constBegin(); it != rd.constEnd(); ++it)
+                c.snapshotRootDefaults.insert(it.key(), it.value().toString());
+        }
+        if (sn.contains("rules")) {
+            c.snapshotRules.clear();
+            for (const QJsonValue& v : sn.value("rules").toArray()) {
+                const QJsonObject o = v.toObject();
+                SnapshotRule r;
+                r.root = o.value("root").toString();
+                r.name = o.value("name").toString();
+                r.policy = o.value("policy").toString("backup");
+                r.reason = o.value("reason").toString();
+                c.snapshotRules << r;
+            }
+        }
+    }
 
     return c;
 }
