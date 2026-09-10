@@ -94,7 +94,7 @@ generated, move the covered entries into that revision and clear them here.
   remains), §13 (Host Bootstrap PowerShell row → superseded by `--bootstrap`).
 
 ### 6. P4 잔여 — Service lifecycle real-environment verification
-- Commits: `<fill on merge>` (branch `feat/service-cli`)
+- Commits: 846b547, merge 503edf2
 - New CLI surface: `devmanager-scan --service <id> --service-op status|stop|start|restart`
   (`ServiceLifecycle` had only a GUI + coordinator entry point before).
 - Code fix: `LifecycleResult.error` now surfaces the process **stderr** on
