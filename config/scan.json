@@ -19,7 +19,8 @@
   ],
 
   "services": [
-    { "id": "headroom", "name": "Headroom", "port": 8787, "snapshotBlocker": true,
+    { "_comment": "stop/start/restart below assume a FOREGROUND headroom deployment. This machine's 'init-user' profile uses persistent-task (Windows Scheduled Task) scheduling, for which `headroom install stop|start|restart` is rejected -- verified 2026-09-11. For a task deployment, point these at `schtasks /end|/run /tn headroom-<profile>-startup` instead. 'status' works for both.",
+      "id": "headroom", "name": "Headroom", "port": 8787, "snapshotBlocker": true,
       "lifecycle": { "exe": "headroom",
         "status":  ["install", "status",  "--profile", "init-user"],
         "stop":    ["install", "stop",    "--profile", "init-user"],

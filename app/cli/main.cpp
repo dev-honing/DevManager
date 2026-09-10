@@ -9,6 +9,7 @@
 #include "health_check.h"
 #include "json_io.h"
 #include "scan/env_scanner.h"
+#include "service/service_lifecycle.h"
 #include "service/service_probe.h"
 #include "snapshot/restore_executor.h"
 #include "snapshot/restore_preview.h"
@@ -63,6 +64,10 @@ int main(int argc, char** argv)
     QCommandLineOption bootstrapOpt("bootstrap", "Print install commands for the "
                                                  "configured tools that are missing "
                                                  "(does not run them).");
+    QCommandLineOption serviceOpt("service", "Service id to control (with --service-op).",
+                                  "id");
+    QCommandLineOption serviceOpOpt("service-op", "status | stop | start | restart.",
+                                    "op", "status");
     QCommandLineOption pruneOpt("prune", "Show which snapshots retention would drop "
                                          "(add --apply to delete them).");
     QCommandLineOption keepLastOpt("keep-last", "prune: keep the N newest snapshots.",
@@ -83,6 +88,8 @@ int main(int argc, char** argv)
     parser.addOption(unbundleOutOpt);
     parser.addOption(healthOpt);
     parser.addOption(bootstrapOpt);
+    parser.addOption(serviceOpt);
+    parser.addOption(serviceOpOpt);
     parser.addOption(pruneOpt);
     parser.addOption(keepLastOpt);
     parser.addOption(keepDaysOpt);
@@ -102,6 +109,27 @@ int main(int argc, char** argv)
         err << (h.ok ? "READY " : "NOT READY ") << h.okCount << " ok, "
             << h.warnCount << " warn, " << h.failCount << " fail\n";
         return h.ok ? 0 : 2;
+    }
+
+    // ---- service lifecycle -------------------------------------------
+    if (parser.isSet(serviceOpt)) {
+        const QString id = parser.value(serviceOpt);
+        const QString opStr = parser.value(serviceOpOpt).toLower();
+        dm::LifecycleOp op = dm::LifecycleOp::Status;
+        if (opStr == "stop") op = dm::LifecycleOp::Stop;
+        else if (opStr == "start") op = dm::LifecycleOp::Start;
+        else if (opStr == "restart") op = dm::LifecycleOp::Restart;
+        else if (opStr != "status") {
+            err << "error: --service-op must be status|stop|start|restart\n";
+            return 1;
+        }
+        const dm::LifecycleResult r = dm::ServiceLifecycle::run(id, op);
+        err << (r.ok ? "OK  " : "FAIL ") << id << " " << dm::lifecycleOpName(op) << "\n";
+        if (!r.output.isEmpty())
+            err << r.output << "\n";
+        if (!r.error.isEmpty())
+            err << "  err: " << r.error << "\n";
+        return r.ok ? 0 : 2;
     }
 
     // ---- bootstrap: print install commands for missing tools ----------

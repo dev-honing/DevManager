@@ -62,13 +62,21 @@ LifecycleResult ServiceLifecycle::run(const ServiceSpec& spec, LifecycleOp op)
     const ProcessResult pr = ProcessRunner::run(exe, args, 30000);
     r.ok = pr.ok();
     r.output = pr.outText();
-    if (!pr.started)
+    if (!pr.started) {
         r.error = "could not launch " + exe;
-    else if (pr.timedOut)
+    } else if (pr.timedOut) {
         r.error = "timed out";
-    else if (!pr.ok())
-        r.error = pr.outText().isEmpty() ? QString("exit %1").arg(pr.exitCode)
-                                         : pr.outText();
+    } else if (!pr.ok()) {
+        // the reason is often on stderr (e.g. "not supported for this
+        // deployment type") -- surface it, not just the exit code
+        const QString errText = QString::fromLocal8Bit(pr.err).trimmed();
+        if (!errText.isEmpty())
+            r.error = errText;
+        else if (!pr.outText().isEmpty())
+            r.error = pr.outText();
+        else
+            r.error = QString("exit %1").arg(pr.exitCode);
+    }
     return r;
 }
 
