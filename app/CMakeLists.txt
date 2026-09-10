@@ -15,6 +15,7 @@ add_library(devmanager_core STATIC
     core/path_util.cpp
     core/json_io.cpp
     core/fs_ops.cpp
+    core/health_check.cpp
     core/config/scan_config.cpp
     core/scan/skill_scanner.cpp
     core/scan/env_scanner.cpp
@@ -101,6 +102,10 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_snapshot_bundle tests/tst_snapshot_bundle.cpp)
     target_link_libraries(tst_snapshot_bundle PRIVATE devmanager_core Qt6::Test)
     add_test(NAME snapshot_bundle COMMAND tst_snapshot_bundle)
+
+    add_executable(tst_health_check tests/tst_health_check.cpp)
+    target_link_libraries(tst_health_check PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME health_check COMMAND tst_health_check)
 endif()
 
 # ---- install: a self-contained folder (see deploy.bat) ----

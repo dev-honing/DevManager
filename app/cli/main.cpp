@@ -5,6 +5,7 @@
 // --snapshot: also writes a real snapshot under <root>/backups/<stamp>/
 //             (reads the configured dirs, writes only there).
 //
+#include "health_check.h"
 #include "json_io.h"
 #include "scan/env_scanner.h"
 #include "service/service_probe.h"
@@ -55,6 +56,8 @@ int main(int argc, char** argv)
     QCommandLineOption unbundleOpt("unbundle", "Extract a snapshot archive.", "file");
     QCommandLineOption unbundleOutOpt("unbundle-out", "Where to extract (default: cwd).",
                                      "dir");
+    QCommandLineOption healthOpt("health", "Check configured tools / backup roots / "
+                                           "services are ready (read-only).");
     parser.addOption(outOpt);
     parser.addOption(rootOpt);
     parser.addOption(snapOpt);
@@ -67,12 +70,24 @@ int main(int argc, char** argv)
     parser.addOption(bundleOutOpt);
     parser.addOption(unbundleOpt);
     parser.addOption(unbundleOutOpt);
+    parser.addOption(healthOpt);
     parser.process(app);
 
     if (parser.isSet(rootOpt))
         QDir::setCurrent(parser.value(rootOpt));
 
     QTextStream err(stderr);
+
+    // ---- health mode -----------------------------------------------
+    if (parser.isSet(healthOpt)) {
+        const dm::HealthReport h = dm::HealthCheck::run();
+        for (const auto& it : h.items)
+            err << "  " << it.status << "  [" << it.group << "] " << it.name
+                << (it.detail.isEmpty() ? QString() : "  -- " + it.detail) << "\n";
+        err << (h.ok ? "READY " : "NOT READY ") << h.okCount << " ok, "
+            << h.warnCount << " warn, " << h.failCount << " fail\n";
+        return h.ok ? 0 : 2;
+    }
 
     // ---- verify mode -------------------------------------------------
     if (parser.isSet(verifyOpt)) {
