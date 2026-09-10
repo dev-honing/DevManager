@@ -8,6 +8,7 @@
 //   - current config is moved (not deleted) to a kept pre-restore folder
 //   - reparse points are never recursed into (see fs_ops)
 //   - a link target that is missing yields a report, never a broken link
+//   - links are only rebuilt inside roots this run actually restored
 //   - any failure triggers a full rollback in reverse order
 //
 #include <functional>

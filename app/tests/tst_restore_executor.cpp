@@ -21,6 +21,7 @@ private slots:
     void cleanup();
     void restoresPreservesAndRelinks();
     void rollsBackWhenABackupIsMissing();
+    void relinkSkipsLocationsOutsideRestoredScope();
 
 private:
     QByteArray m_savedProfile;
@@ -97,9 +98,16 @@ SnapshotResult TstRestoreExecutor::buildSnapshot()
     loc["path"] = QDir::toNativeSeparators(m_home + "/.agents/skills/gpt-image");
     loc["link"] = link;
 
+    // a second link whose location is NOT under any restored root (.gemini is
+    // not a backupRoot here) -- the relink phase must leave it alone
+    QJsonObject outLoc;
+    outLoc["host"] = "gemini";
+    outLoc["path"] = QDir::toNativeSeparators(m_home + "/.gemini/skills/gpt-image");
+    outLoc["link"] = link;
+
     QJsonObject skill;
     skill["name"] = "gpt-image";
-    skill["locations"] = QJsonArray{loc};
+    skill["locations"] = QJsonArray{loc, outLoc};
 
     QJsonObject discovery;
     discovery["skills"] = QJsonArray{skill};
@@ -164,6 +172,23 @@ void TstRestoreExecutor::rollsBackWhenABackupIsMissing()
     QFile f(m_home + "/.claude/settings.json");
     QVERIFY(f.open(QIODevice::ReadOnly));
     QCOMPARE(f.readAll(), QByteArray("{\"mutated\":1}"));
+}
+
+void TstRestoreExecutor::relinkSkipsLocationsOutsideRestoredScope()
+{
+    const SnapshotResult sr = buildSnapshot();
+    QVERIFY2(sr.ok, sr.errors.join("; ").toUtf8());
+
+    RestoreOptions opts;
+    opts.recreateLinks = true;
+    const RestoreResult rr = RestoreExecutor::run(sr.snapshotDir, opts);
+    QVERIFY2(rr.ok, rr.errors.join("; ").toUtf8());
+
+    const QString joined = rr.linkResults.join("\n");
+    QVERIFY2(joined.contains(".gemini") && joined.contains("outside restored scope"),
+             joined.toUtf8());
+    // nothing was created under the un-restored root
+    QVERIFY(!QFileInfo::exists(m_home + "/.gemini/skills/gpt-image"));
 }
 
 QTEST_MAIN(TstRestoreExecutor)
