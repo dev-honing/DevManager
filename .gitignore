@@ -1,0 +1,36 @@
+# --- secrets / machine state: NEVER commit ---
+backups/
+inventory.json
+config/versions.json
+config/*.local.json
+*.token
+*.key
+.env
+.env.*
+secrets*
+auth.json
+.headroom/
+.omniroute/
+
+# --- build output ---
+build/
+out/
+Debug/
+Release/
+*.obj
+*.exe
+*.dll
+*.pdb
+CMakeUserPresets.json
+.vs/
+.vscode/
+compile_commands.json
+
+# --- node ---
+node_modules/
+npm-debug.log*
+
+# --- os ---
+Thumbs.db
+Desktop.ini
+.DS_Store

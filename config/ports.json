@@ -1,0 +1,5 @@
+{
+  "headroom": 8787,
+  "omniroute": 20128,
+  "_containerAccess": "컨테이너 → http://host.docker.internal:<port>. Headroom은 HEADROOM_HOST=0.0.0.0 필요(기본 127.0.0.1)."
+}

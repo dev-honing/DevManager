@@ -1,0 +1,23 @@
+{
+  "_note": "scripts/snapshot-current.ps1 이 현재 머신을 스캔해 versions.json(gitignore됨)을 생성한다. 이 파일은 형태 참고용.",
+  "host": {
+    "dockerDesktop": "29.6.2",
+    "wsl": "2",
+    "node": "24.18.0",
+    "npm": "11.16.0",
+    "python": "3.12.10",
+    "cmake": "4.4.0",
+    "headroom": "0.37.0",
+    "omniroute": "3.8.50",
+    "claudeCode": "2.1.267",
+    "codex": "0.153.4",
+    "qt": "6.10.3",
+    "visualStudio": "2026",
+    "msvcToolset": "v143"
+  },
+  "images": {
+    "base": "ai-dev-base:0.1",
+    "cpp": "ai-dev-cpp:0.1",
+    "nextjs": "ai-dev-next:0.1"
+  }
+}

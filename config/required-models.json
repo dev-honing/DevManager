@@ -1,0 +1,6 @@
+{
+  "_note": "OmniRoute /v1/models 에 최소한 존재해야 하는 모델 ID. Phase 1 check.ps1 이 대조한다.",
+  "required": [
+    "auto/best-coding"
+  ]
+}
