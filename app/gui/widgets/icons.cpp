@@ -116,6 +116,9 @@ static void draw(QPainter& p, const QString& n)
         p.drawEllipse(QPointF(12, 12), 8, 9);
         p.drawEllipse(QPointF(9.5, 10), 1.2, 1.6);
         p.drawEllipse(QPointF(14.5, 10), 1.2, 1.6);
+    } else if (n == "stop") {
+        p.setBrush(p.pen().color());
+        rr(7, 7, 10, 10, 1.5);
     } else if (n == "dot") {
         // painted by pixmap() as a filled circle
     } else {                            // fallback: circle

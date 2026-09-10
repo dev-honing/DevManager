@@ -92,6 +92,13 @@ void MainWindow::buildUi()
     m_stack->addWidget(m_envVarsPage);    // 4
     m_snapshotPage = new SnapshotPage;
     m_restorePage = new RestorePage;
+    connect(m_snapshotPage, &SnapshotPage::snapshotCreated, this, [this] {
+        m_rightPanel->setSnapshots(SnapshotIndex::list(m_backupsDir));
+        m_restorePage->setContext(m_backupsDir, m_lastServices);
+    });
+    connect(m_restorePage, &RestorePage::restoreApplied, this, [this] {
+        m_controller.scanEnvironment();
+    });
     m_stack->addWidget(m_snapshotPage);   // 5
     m_stack->addWidget(m_restorePage);    // 6
     m_stack->addWidget(new PlaceholderPage(
@@ -106,6 +113,25 @@ void MainWindow::buildUi()
         if (!m_devRoot.isEmpty())
             QDesktopServices::openUrl(QUrl::fromLocalFile(m_devRoot));
     });
+    connect(m_rightPanel, &RightPanel::serviceControlRequested, this,
+            [this](const QString& id, LifecycleOp op) {
+                const QString verb = lifecycleOpName(op);
+                if (QMessageBox::question(
+                        this, "Service control",
+                        QString("%1 %2 now?\n\nThis changes the running service.")
+                            .arg(verb.left(1).toUpper() + verb.mid(1), id),
+                        QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel)
+                    == QMessageBox::Yes)
+                    m_controller.controlService(id, op);
+            });
+    connect(&m_controller, &AppController::serviceControlled, this,
+            [this](const LifecycleResult& r) {
+                statusBar()->showMessage(
+                    QString("%1 %2: %3")
+                        .arg(r.serviceId, lifecycleOpName(r.op),
+                             r.ok ? QStringLiteral("ok") : r.error),
+                    6000);
+            });
 
     auto* rightSide = new QWidget;
     auto* rightLay = new QVBoxLayout(rightSide);
@@ -177,6 +203,7 @@ void MainWindow::onServicesProbed(const QList<ServiceState>& services)
 void MainWindow::refreshMigrationPages()
 {
     m_snapshotPage->setServices(m_lastServices);
+    m_snapshotPage->setBackupsDir(m_backupsDir);
     m_restorePage->setContext(m_backupsDir, m_lastServices);
 }
 

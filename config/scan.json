@@ -19,8 +19,17 @@
   ],
 
   "services": [
-    { "id": "headroom",  "name": "Headroom",  "port": 8787 },
-    { "id": "omniroute", "name": "OmniRoute", "port": 20128 },
+    { "id": "headroom", "name": "Headroom", "port": 8787,
+      "lifecycle": { "exe": "headroom",
+        "status":  ["install", "status",  "--profile", "init-user"],
+        "stop":    ["install", "stop",    "--profile", "init-user"],
+        "start":   ["install", "start",   "--profile", "init-user"],
+        "restart": ["install", "restart", "--profile", "init-user"],
+        "startDetached": false } },
+    { "id": "omniroute", "name": "OmniRoute", "port": 20128,
+      "lifecycle": { "exe": "omniroute",
+        "status": ["status"], "stop": ["stop"], "start": ["serve"], "restart": ["restart"],
+        "startDetached": true } },
     { "id": "ollama",    "name": "Ollama",    "port": 11434 },
     { "id": "docker",    "name": "Docker",    "cliCheck": ["docker", "version", "--format", "{{.Server.Version}}"] },
     { "id": "wsl",       "name": "WSL",       "wslRunning": true }
@@ -44,5 +53,51 @@
 
   "qtSearchPaths": ["C:/Qt", "~/Qt", "$QTDIR", "$QT_ROOT", "/opt/Qt"],
 
-  "backupRoots": ["~/.claude", "~/.codex", "~/.agents", "~/.gemini", "~/.headroom", "~/.omniroute"]
+  "backupRoots": ["~/.claude", "~/.codex", "~/.agents", "~/.gemini", "~/.headroom", "~/.omniroute"],
+
+  "snapshot": {
+    "_comment": "How each top-level entry under a backupRoot is treated. First matching rule wins; root ''/name '' means 'any'. Policies: backup | inventory-only | regenerate | exclude. rootDefaults is the fallback per root dir ('*' = all others). Add a rule for any AI tool you put in backupRoots.",
+    "rootDefaults": { ".claude": "exclude", ".codex": "exclude", ".headroom": "exclude", ".omniroute": "exclude", "*": "backup" },
+    "rules": [
+      { "root": ".claude", "name": "settings.json", "policy": "backup", "reason": "core config" },
+      { "root": ".claude", "name": "CLAUDE.md", "policy": "backup", "reason": "user rules" },
+      { "root": ".claude", "name": ".credentials.json", "policy": "exclude", "reason": "secret" },
+      { "root": ".claude", "name": "skills", "policy": "backup", "reason": "user skills" },
+      { "root": ".claude", "name": "plugins", "policy": "regenerate", "reason": "re-install from marketplace" },
+      { "root": ".claude", "name": "projects", "policy": "inventory-only", "reason": "session transcripts" },
+      { "root": ".claude", "name": "history.jsonl", "policy": "inventory-only", "reason": "prompt history" },
+      { "root": ".claude", "name": "cache", "policy": "exclude", "reason": "cache" },
+      { "root": ".claude", "name": "file-history", "policy": "exclude", "reason": "editor undo" },
+      { "root": ".claude", "name": "shell-snapshots", "policy": "exclude", "reason": "runtime" },
+      { "root": ".codex", "name": "config.toml", "policy": "backup", "reason": "core config" },
+      { "root": ".codex", "name": "AGENTS.md", "policy": "backup", "reason": "user rules" },
+      { "root": ".codex", "name": "hooks.json", "policy": "backup", "reason": "config" },
+      { "root": ".codex", "name": "auth.json", "policy": "exclude", "reason": "secret" },
+      { "root": ".codex", "name": "skills", "policy": "backup", "reason": "user skills" },
+      { "root": ".codex", "name": "plugins", "policy": "regenerate", "reason": "re-install" },
+      { "root": ".codex", "name": ".tmp", "policy": "exclude", "reason": "scratch" },
+      { "root": ".codex", "name": ".sandbox-bin", "policy": "exclude", "reason": "runtime" },
+      { "root": ".codex", "name": "sessions", "policy": "inventory-only", "reason": "session data" },
+      { "root": ".codex", "name": "cache", "policy": "exclude", "reason": "cache" },
+      { "root": ".headroom", "name": "deploy", "policy": "backup", "reason": "deployment definition" },
+      { "root": ".headroom", "name": "config", "policy": "backup", "reason": "config" },
+      { "root": ".headroom", "name": "logs", "policy": "exclude", "reason": "logs" },
+      { "root": ".omniroute", "name": ".env", "policy": "exclude", "reason": "secret" },
+      { "root": ".omniroute", "name": "storage.sqlite", "policy": "backup", "reason": "routing state" },
+      { "root": ".omniroute", "name": "call_logs", "policy": "exclude", "reason": "logs" },
+      { "root": ".omniroute", "name": "db_backups", "policy": "exclude", "reason": "logs" },
+      { "root": ".omniroute", "name": "logs", "policy": "exclude", "reason": "logs" },
+
+      { "root": "", "name": "logs", "policy": "exclude", "reason": "logs" },
+      { "root": "", "name": "cache", "policy": "exclude", "reason": "cache" },
+      { "root": "", "name": ".cache", "policy": "exclude", "reason": "cache" },
+      { "root": "", "name": "tmp", "policy": "exclude", "reason": "scratch" },
+      { "root": "", "name": ".tmp", "policy": "exclude", "reason": "scratch" },
+      { "root": "", "name": "node_modules", "policy": "regenerate", "reason": "re-install" },
+      { "root": "", "name": "auth.json", "policy": "exclude", "reason": "secret" },
+      { "root": "", "name": ".env", "policy": "exclude", "reason": "secret" },
+      { "root": "", "name": "credentials.json", "policy": "exclude", "reason": "secret" },
+      { "root": "", "name": ".credentials.json", "policy": "exclude", "reason": "secret" }
+    ]
+  }
 }

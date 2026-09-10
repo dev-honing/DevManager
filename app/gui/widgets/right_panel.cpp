@@ -8,7 +8,10 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QToolButton>
 #include <QVBoxLayout>
+
+#include "config/scan_config.h"
 
 namespace dm {
 
@@ -39,6 +42,10 @@ RightPanel::RightPanel(QWidget* parent) : QWidget(parent)
     setAttribute(Qt::WA_StyledBackground, true);
     setStyleSheet(QString("#rightPanel{background:%1;border-left:1px solid %2;}")
                       .arg(Color::Bg, Color::Border));
+
+    for (const ServiceSpec& s : ScanConfig::load().services)
+        if (s.lifecycle.canControl())
+            m_controllable.insert(s.id);
 
     auto* outer = new QVBoxLayout(this);
     outer->setContentsMargins(14, 16, 14, 16);
@@ -134,6 +141,26 @@ void RightPanel::setServices(const QList<ServiceState>& services)
         rl->addWidget(name);
         rl->addStretch(1);
         rl->addWidget(badge);
+
+        if (m_controllable.contains(s.id)) {
+            const QString sid = s.id;
+            auto mkCtl = [&](const char* icon, const QString& tip, LifecycleOp op) {
+                auto* b = new QToolButton;
+                b->setObjectName("iconBtn");
+                b->setIcon(icons::icon(icon, QColor(Color::Muted), 13));
+                b->setToolTip(tip);
+                b->setCursor(Qt::PointingHandCursor);
+                connect(b, &QToolButton::clicked, this,
+                        [this, sid, op] { emit serviceControlRequested(sid, op); });
+                rl->addWidget(b);
+            };
+            if (s.level == ServiceState::Running) {
+                mkCtl("restore", "Restart " + s.name, LifecycleOp::Restart);
+                mkCtl("stop", "Stop " + s.name, LifecycleOp::Stop);
+            } else {
+                mkCtl("refresh", "Start " + s.name, LifecycleOp::Start);
+            }
+        }
         m_statusRows->addWidget(row);
     }
 }

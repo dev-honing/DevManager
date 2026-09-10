@@ -25,6 +25,7 @@ struct PlannedArtifact {
     qint64 sizeBytes = 0;
     int fileCount = 0;
     bool isLink = false;
+    QString linkType;      // "Junction" | "SymbolicLink"
     QString linkTarget;
 };
 

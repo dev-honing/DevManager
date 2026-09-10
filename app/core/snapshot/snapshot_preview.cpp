@@ -24,67 +24,33 @@ QString policyName(SnapshotPolicy p)
 
 namespace {
 
-struct Rule {
-    QString rootId;     // "" = any
-    QString name;       // "" = any top-level entry under rootId
-    SnapshotPolicy policy;
-    QString reason;
-};
-
-// First match wins. Default (no match) is per-root, see rootDefault().
-// ponytail: built-in default table; move to config alongside backupRoots
-//           if users need to retune it per machine.
-const QList<Rule>& rules()
+SnapshotPolicy parsePolicy(const QString& s)
 {
-    static const QList<Rule> t = {
-        // .claude
-        {".claude", "settings.json", SnapshotPolicy::Backup, "core config"},
-        {".claude", "CLAUDE.md", SnapshotPolicy::Backup, "user rules"},
-        {".claude", ".credentials.json", SnapshotPolicy::Exclude, "secret — re-login"},
-        {".claude", "skills", SnapshotPolicy::Backup, "user skills"},
-        {".claude", "plugins", SnapshotPolicy::Regenerate, "re-install from marketplace"},
-        {".claude", "projects", SnapshotPolicy::InventoryOnly, "session transcripts"},
-        {".claude", "history.jsonl", SnapshotPolicy::InventoryOnly, "prompt history"},
-        {".claude", "cache", SnapshotPolicy::Exclude, "cache"},
-        {".claude", "file-history", SnapshotPolicy::Exclude, "editor undo"},
-        {".claude", "shell-snapshots", SnapshotPolicy::Exclude, "runtime"},
-        // .codex
-        {".codex", "config.toml", SnapshotPolicy::Backup, "core config"},
-        {".codex", "AGENTS.md", SnapshotPolicy::Backup, "user rules"},
-        {".codex", "hooks.json", SnapshotPolicy::Backup, "config"},
-        {".codex", "auth.json", SnapshotPolicy::Exclude, "secret — re-login"},
-        {".codex", "skills", SnapshotPolicy::Backup, "user skills"},
-        {".codex", "plugins", SnapshotPolicy::Regenerate, "re-install"},
-        {".codex", ".tmp", SnapshotPolicy::Exclude, "scratch"},
-        {".codex", ".sandbox-bin", SnapshotPolicy::Exclude, "runtime"},
-        {".codex", "sessions", SnapshotPolicy::InventoryOnly, "session data"},
-        {".codex", "cache", SnapshotPolicy::Exclude, "cache"},
-        // .headroom
-        {".headroom", "deploy", SnapshotPolicy::Backup, "deployment definition"},
-        {".headroom", "config", SnapshotPolicy::Backup, "config"},
-        {".headroom", "logs", SnapshotPolicy::Exclude, "logs"},
-        // .omniroute
-        {".omniroute", ".env", SnapshotPolicy::Exclude, "secret — re-login"},
-        {".omniroute", "storage.sqlite", SnapshotPolicy::Backup, "routing state"},
-        {".omniroute", "call_logs", SnapshotPolicy::Exclude, "logs"},
-        {".omniroute", "db_backups", SnapshotPolicy::Exclude, "logs"},
-        {".omniroute", "logs", SnapshotPolicy::Exclude, "logs"},
-    };
-    return t;
+    if (s == "backup") return SnapshotPolicy::Backup;
+    if (s == "inventory-only") return SnapshotPolicy::InventoryOnly;
+    if (s == "regenerate") return SnapshotPolicy::Regenerate;
+    return SnapshotPolicy::Exclude;
 }
 
-SnapshotPolicy rootDefault(const QString& rootId, QString* reason)
+// config rules first (root-specific before generic), then per-root default,
+// then the "*" catch-all.
+SnapshotPolicy classify(const ScanConfig& cfg, const QString& rootId,
+                        const QString& name, QString* reason)
 {
-    if (rootId == ".agents" || rootId == ".gemini") {
-        *reason = "config";
-        return SnapshotPolicy::Backup;
+    for (const SnapshotRule& r : cfg.snapshotRules) {
+        if (!r.root.isEmpty() && r.root != rootId)
+            continue;
+        if (!r.name.isEmpty() && r.name != name)
+            continue;
+        *reason = r.reason.isEmpty() ? r.policy : r.reason;
+        return parsePolicy(r.policy);
     }
-    if (rootId == ".claude" || rootId == ".codex") {
-        *reason = "runtime";
-        return SnapshotPolicy::Exclude;
+    if (cfg.snapshotRootDefaults.contains(rootId)) {
+        *reason = "root default";
+        return parsePolicy(cfg.snapshotRootDefaults.value(rootId));
     }
     *reason = "default";
-    return SnapshotPolicy::Backup;
+    return parsePolicy(cfg.snapshotRootDefaults.value("*", "backup"));
 }
 
 // Exact recursive size. Only used for Backup-policy entries (small), so the
@@ -133,20 +99,10 @@ SnapshotPreview SnapshotPlanner::compute(const QList<ServiceState>& services)
 
             const LinkInfo link = path::probeLink(e.absoluteFilePath());
             a.isLink = link.isLink;
+            a.linkType = link.linkType;
             a.linkTarget = link.target;
 
-            bool matched = false;
-            for (const Rule& r : rules()) {
-                if ((r.rootId.isEmpty() || r.rootId == rootId)
-                    && (r.name.isEmpty() || r.name == a.name)) {
-                    a.policy = r.policy;
-                    a.reason = r.reason;
-                    matched = true;
-                    break;
-                }
-            }
-            if (!matched)
-                a.policy = rootDefault(rootId, &a.reason);
+            a.policy = classify(cfg, rootId, a.name, &a.reason);
             if (a.isLink && a.policy == SnapshotPolicy::Backup)
                 a.reason = "link — recreated, not copied";
 

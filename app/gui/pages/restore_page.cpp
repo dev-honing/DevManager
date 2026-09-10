@@ -6,11 +6,14 @@
 
 #include <QtConcurrent>
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QInputDialog>
 #include <QLabel>
 #include <QMessageBox>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QTableWidget>
 #include <QVBoxLayout>
@@ -26,8 +29,9 @@ RestorePage::RestorePage(QWidget* parent) : QWidget(parent)
     auto* title = new QLabel("Restore");
     title->setObjectName("pageTitle");
     title->setFont(uiFont(16, QFont::Bold, true));
-    auto* sub = new QLabel("Pick a snapshot and run a dry check. Restore is dry-run "
-                           "only until the backend lands.");
+    auto* sub = new QLabel("Dry check a snapshot, then apply it. Apply moves your "
+                           "current config aside (kept), restores, and rolls back "
+                           "on any failure.");
     sub->setObjectName("pageSubtitle");
     lay->addWidget(title);
     lay->addWidget(sub);
@@ -44,11 +48,23 @@ RestorePage::RestorePage(QWidget* parent) : QWidget(parent)
     m_restoreBtn->setEnabled(false);
     m_restoreBtn->setCursor(Qt::PointingHandCursor);
     connect(m_restoreBtn, &QPushButton::clicked, this, &RestorePage::confirmRestore);
+    m_recreateLinks = new QCheckBox("recreate links");
+    m_recreateLinks->setChecked(true);
+    m_includeMachine = new QCheckBox("machine settings");
+
     bar->addWidget(m_picker);
     bar->addWidget(m_dryBtn);
+    bar->addSpacing(12);
+    bar->addWidget(m_recreateLinks);
+    bar->addWidget(m_includeMachine);
     bar->addStretch(1);
     bar->addWidget(m_restoreBtn);
     lay->addLayout(bar);
+
+    m_progress = new QProgressBar;
+    m_progress->setRange(0, 0);
+    m_progress->hide();
+    lay->addWidget(m_progress);
 
     m_remap = new QLabel;
     m_remap->setFont(monoFont(9));
@@ -93,6 +109,8 @@ RestorePage::RestorePage(QWidget* parent) : QWidget(parent)
 
     connect(&m_watcher, &QFutureWatcher<RestorePreview>::finished, this,
             [this] { render(m_watcher.result()); });
+    connect(&m_execWatcher, &QFutureWatcher<RestoreResult>::finished, this,
+            [this] { onRestored(m_execWatcher.result()); });
 }
 
 void RestorePage::setContext(const QString& backupsDir,
@@ -163,6 +181,7 @@ void RestorePage::render(const RestorePreview& pv)
 
     m_preBackup->setText("pre-restore backup would go to:  " + pv.preRestoreBackupDir);
     m_preBackup->show();
+    m_dryChecked = true;
 
     m_table->clearContents();
     m_table->setRowCount(pv.targets.size());
@@ -194,18 +213,82 @@ void RestorePage::render(const RestorePreview& pv)
 
 void RestorePage::confirmRestore()
 {
-    const auto btn = QMessageBox::warning(
-        this, "Restore",
-        "This would move your current config aside and restore the selected "
-        "snapshot.\n\nProceed?",
-        QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
-    if (btn != QMessageBox::Yes)
+    if (!m_dryChecked || m_execWatcher.isRunning()
+        || m_picker->currentData().isNull())
         return;
-    QMessageBox::information(
-        this, "Restore",
-        "Restore execution is not implemented yet — this build is dry-run only.\n"
-        "The PowerShell reference (scripts/restore-current.ps1) remains the way "
-        "to actually restore.");
+
+    const QString dir = m_picker->currentData().toString();
+
+    const auto proceed = QMessageBox::warning(
+        this, "Apply restore",
+        QString("This will:\n"
+                "  1. move your current config aside (kept under pre-restore-*)\n"
+                "  2. restore the snapshot\n"
+                "  3. %1recreate links\n"
+                "  4. verify, and roll everything back if any step fails\n\n"
+                "Snapshot:  %2\n\nContinue?")
+            .arg(m_recreateLinks->isChecked() ? "" : "NOT ", dir),
+        QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+    if (proceed != QMessageBox::Yes)
+        return;
+
+    bool okTyped = false;
+    const QString typed = QInputDialog::getText(
+        this, "Confirm restore", "Type  RESTORE  to apply:", QLineEdit::Normal,
+        QString(), &okTyped);
+    if (!okTyped || typed.trimmed() != "RESTORE")
+        return;
+
+    RestoreOptions opts;
+    opts.includeMachine = m_includeMachine->isChecked();
+    opts.recreateLinks = m_recreateLinks->isChecked();
+
+    m_restoreBtn->setEnabled(false);
+    m_dryBtn->setEnabled(false);
+    m_progress->setFormat("restoring...");
+    m_progress->show();
+
+    m_execWatcher.setFuture(QtConcurrent::run([dir, opts, this] {
+        return RestoreExecutor::run(
+            dir, opts, [this](RestoreState s, const QString& d) {
+                const QString label = restoreStateName(s)
+                                      + (d.isEmpty() ? QString() : "  " + d);
+                QMetaObject::invokeMethod(
+                    this, [this, label] { m_progress->setFormat(label); },
+                    Qt::QueuedConnection);
+            });
+    }));
+}
+
+void RestorePage::onRestored(const RestoreResult& r)
+{
+    m_progress->hide();
+    m_dryBtn->setEnabled(true);
+    m_restoreBtn->setEnabled(true);
+
+    QStringList lines;
+    lines << "State: " + restoreStateName(r.state);
+    lines << QString("Restored %1 component(s)").arg(r.restored);
+    if (!r.preRestoreDir.isEmpty())
+        lines << "Previous config kept at:\n  " + r.preRestoreDir;
+    if (!r.linkResults.isEmpty())
+        lines << "\nLinks:\n  " + r.linkResults.join("\n  ");
+    if (!r.errors.isEmpty())
+        lines << "\nErrors:\n  " + r.errors.join("\n  ");
+    if (!r.rollbackErrors.isEmpty())
+        lines << "\nROLLBACK ERRORS:\n  " + r.rollbackErrors.join("\n  ");
+
+    if (r.ok) {
+        QMessageBox::information(this, "Restore complete", lines.join("\n"));
+        emit restoreApplied();
+    } else if (r.state == RestoreState::RolledBack) {
+        QMessageBox::warning(this, "Restore failed — rolled back",
+                             lines.join("\n"));
+    } else {
+        QMessageBox::critical(
+            this, "Restore failed — rollback incomplete",
+            lines.join("\n") + "\n\nManual recovery from:\n  " + r.preRestoreDir);
+    }
 }
 
 } // namespace dm
