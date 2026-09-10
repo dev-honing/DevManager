@@ -88,6 +88,7 @@ struct EnvironmentInventory {
     bool os64Bit = true;
 
     QMap<QString, QString> tools;   // docker,node,npm,python,cmake,git,claude,codex,headroom,omniroute
+    QMap<QString, QString> toolPaths;   // same keys -> resolved executable path (UI only)
     QString qt;
     QString visualStudio;
     WslInfo wsl;

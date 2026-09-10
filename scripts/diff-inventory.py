@@ -70,7 +70,7 @@ def main():
 
     diffs = []
 
-    # tools
+    # tools  (toolPaths is a UI-only convenience field, not compared)
     for k in sorted(set(ps.get("tools", {})) | set(cpp.get("tools", {}))):
         a, b = ps.get("tools", {}).get(k), cpp.get("tools", {}).get(k)
         if (a or "") != (b or ""):

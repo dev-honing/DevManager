@@ -7,28 +7,33 @@ class QTreeWidget;
 class QTableWidget;
 class QLineEdit;
 class QLabel;
-class QListWidget;
 class QStackedWidget;
-class QPushButton;
 
 namespace dm {
+
+class TopBar;
+class Sidebar;
+class SummaryCard;
+class EnvironmentPage;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
     explicit MainWindow(QWidget* parent = nullptr);
+    void selectPage(const QString& id);   // for --shot verification
 
 private slots:
     void onScanStarted();
     void onScanFinished(const dm::EnvironmentInventory& inv);
+    void onNavSelected(const QString& id);
     void filterPackages(const QString& text);
 
 private:
     void buildUi();
-    QWidget* buildHeader();
-    QWidget* buildStatRow();
-    QWidget* wrapPage(QWidget* content);
-    void populateEnvironment(const EnvironmentInventory& inv);
+    QWidget* buildSkillsPage();
+    QWidget* buildPluginsPage();
+    QWidget* buildPackagesPage();
+    QWidget* buildEnvVarsPage();
     void populateSkills(const EnvironmentInventory& inv);
     void populatePlugins(const EnvironmentInventory& inv);
     void populatePackages(const EnvironmentInventory& inv);
@@ -36,17 +41,16 @@ private:
 
     AppController m_controller;
 
-    QPushButton* m_scanButton = nullptr;
-    QLabel* m_headerStatus = nullptr;
-    QListWidget* m_nav = nullptr;
+    TopBar* m_topBar = nullptr;
+    Sidebar* m_sidebar = nullptr;
     QStackedWidget* m_stack = nullptr;
 
-    QLabel* m_statTools = nullptr;
-    QLabel* m_statSkills = nullptr;
-    QLabel* m_statLinked = nullptr;
-    QLabel* m_statPackages = nullptr;
+    SummaryCard* m_cardTools = nullptr;
+    SummaryCard* m_cardSkills = nullptr;
+    SummaryCard* m_cardLinked = nullptr;
+    SummaryCard* m_cardPackages = nullptr;
 
-    QTreeWidget* m_envTree = nullptr;
+    EnvironmentPage* m_envPage = nullptr;
     QTreeWidget* m_skillTree = nullptr;
     QTreeWidget* m_pluginTree = nullptr;
     QTableWidget* m_packageTable = nullptr;

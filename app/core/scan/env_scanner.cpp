@@ -49,6 +49,26 @@ QMap<QString, QString> EnvironmentScanner::scanTools()
     return t;
 }
 
+QMap<QString, QString> EnvironmentScanner::scanToolPaths()
+{
+    QMap<QString, QString> paths;
+    for (const char* name : {"docker", "node", "npm", "python", "cmake", "git",
+                             "claude", "codex", "omniroute"}) {
+        const QString p = QStandardPaths::findExecutable(name);
+        if (!p.isEmpty())
+            paths.insert(name, QDir::toNativeSeparators(p));
+    }
+    QString hr = QStandardPaths::findExecutable("headroom");
+    if (hr.isEmpty()) {
+        const QString fb = path::homeDir() + "/.local/bin/headroom.exe";
+        if (QFileInfo::exists(fb))
+            hr = fb;
+    }
+    if (!hr.isEmpty())
+        paths.insert("headroom", QDir::toNativeSeparators(hr));
+    return paths;
+}
+
 QString EnvironmentScanner::scanQt()
 {
     QDir qt("C:/Qt");
@@ -221,6 +241,7 @@ EnvironmentInventory EnvironmentScanner::scan()
     inv.os64Bit = QSysInfo::currentCpuArchitecture().contains("64");
 
     inv.tools = scanTools();
+    inv.toolPaths = scanToolPaths();
     inv.qt = scanQt();
     inv.visualStudio = scanVisualStudio();
     inv.wsl = scanWsl();

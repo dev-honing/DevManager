@@ -30,6 +30,15 @@ add_executable(devmanager-gui WIN32
     gui/app_controller.cpp
     gui/main_window.cpp
     gui/theme.cpp
+    gui/widgets/icons.cpp
+    gui/widgets/status_badge.cpp
+    gui/widgets/summary_card.cpp
+    gui/widgets/sidebar.cpp
+    gui/widgets/top_bar.cpp
+    gui/widgets/segmented_control.cpp
+    gui/widgets/machine_card.cpp
+    gui/pages/environment_page.cpp
+    gui/pages/placeholder_page.cpp
 )
 target_include_directories(devmanager-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(devmanager-gui PRIVATE

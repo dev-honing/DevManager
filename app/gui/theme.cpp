@@ -41,17 +41,138 @@ QFont monoFont(int pointSize)
     return f;
 }
 
-namespace {
-constexpr const char* kAccent = "#3b82f6";
-constexpr const char* kBg = "#1e1f22";
-constexpr const char* kPanel = "#2b2d30";
-constexpr const char* kPanel2 = "#26282b";
-constexpr const char* kBorder = "#393b40";
-constexpr const char* kText = "#dfe1e5";
-constexpr const char* kMuted = "#9aa0a6";
-} // namespace
+const char* accentHex() { return Color::Primary; }
 
-const char* accentHex() { return kAccent; }
+static QString styleSheet()
+{
+    // sections kept separate for readability; %(token) placeholders resolved below
+    const QString sheet = QStringLiteral(R"QSS(
+/* base */
+QWidget { color: %(text); }
+QMainWindow, QDialog { background: %(bg); }
+QToolTip { background: %(panel); color: %(text); border: 1px solid %(border);
+           padding: 4px 7px; border-radius: 5px; }
+
+/* top bar */
+#topBar { background: %(bg); border-bottom: 1px solid %(border); }
+#appLogo { background: %(primary); border-radius: 7px; color: #ffffff;
+           font-weight: 800; }
+#appTitle { font-size: 15px; font-weight: 700; }
+#appSubtitle { color: %(muted); font-size: 11px; }
+#topSearch { background: %(panelAlt); border: 1px solid %(border);
+             border-radius: 8px; padding: 7px 10px; }
+#topSearch:focus { border: 1px solid %(primary); }
+#lastScanned { color: %(muted); font-size: 12px; }
+
+QPushButton#primaryBtn {
+    background: %(primary); color: #ffffff; border: none;
+    border-radius: 7px; padding: 8px 16px; font-weight: 600;
+}
+QPushButton#primaryBtn:hover { background: %(primaryHover); }
+QPushButton#primaryBtn:disabled { background: %(border); color: %(muted); }
+
+QPushButton#secondaryBtn {
+    background: %(panel); color: %(text); border: 1px solid %(border);
+    border-radius: 7px; padding: 8px 14px;
+}
+QPushButton#secondaryBtn:hover { background: %(panelHover); border-color: %(primary); }
+QPushButton#secondaryBtn:disabled { color: %(muted); }
+
+QToolButton#iconBtn { background: transparent; border: none; border-radius: 6px;
+                      padding: 5px; }
+QToolButton#iconBtn:hover { background: %(panelHover); }
+
+/* sidebar */
+#sidebar { background: %(bg); border-right: 1px solid %(border); }
+#navItem { background: transparent; border: none; border-radius: 8px; text-align: left;
+           padding: 8px 12px; color: %(textSecondary); font-size: 13px; }
+#navItem:hover { background: %(panelHover); color: %(text); }
+#navItem[selected="true"] {
+    background: %(panelHover); color: %(text); font-weight: 600;
+    border-left: 3px solid %(primary); padding-left: 9px;
+}
+#navBadge { background: %(panelHover); color: %(textSecondary);
+            border-radius: 8px; padding: 1px 7px; font-size: 11px; }
+#navSep { color: %(muted); font-size: 10px; font-weight: 700;
+          letter-spacing: 1px; padding: 12px 12px 4px 12px; }
+#navFootItem { background: transparent; border: none; text-align: left;
+               padding: 6px 12px; color: %(muted); font-size: 12px; }
+#navFootItem:hover { color: %(text); }
+
+/* summary cards */
+#summaryCard { background: %(panel); border: 1px solid %(border); border-radius: 12px; }
+#summaryCard:hover { border-color: %(primary); }
+#cardValue { font-size: 24px; font-weight: 700; }
+#cardLabel { color: %(muted); font-size: 10px; text-transform: uppercase;
+             letter-spacing: 0.8px; }
+#cardHint { color: %(textSecondary); font-size: 11px; }
+
+/* page chrome */
+#pageTitle { font-size: 17px; font-weight: 700; }
+#pageSubtitle { color: %(muted); font-size: 12px; }
+#panelCard { background: %(panel); border: 1px solid %(border);
+             border-radius: 12px; }
+#mono { }
+
+/* segmented control */
+QToolButton#segBtn { background: transparent; border: none; color: %(textSecondary);
+                     padding: 6px 14px; border-radius: 6px; font-size: 12px; }
+QToolButton#segBtn:hover { color: %(text); }
+QToolButton#segBtn:checked { background: %(panel); color: %(text); font-weight: 600; }
+#segTrack { background: %(panelAlt); border: 1px solid %(border); border-radius: 8px; }
+
+/* tables & trees */
+QTreeWidget, QTableWidget, QTableView, QTreeView {
+    background: %(panel); alternate-background-color: %(panelAlt);
+    border: 1px solid %(border); border-radius: 12px;
+    gridline-color: transparent; outline: 0;
+}
+QTreeWidget::item, QTableWidget::item, QTableView::item {
+    padding: 6px 8px; border: none;
+}
+QTreeWidget::item:selected, QTableWidget::item:selected, QTableView::item:selected {
+    background: %(navSel); color: %(text);
+}
+QHeaderView::section {
+    background: %(panel); color: %(muted); border: none;
+    border-bottom: 1px solid %(border); padding: 9px 8px; font-weight: 600;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+QTreeView::branch { background: %(panel); }
+
+/* inputs, misc */
+QLineEdit {
+    background: %(panelAlt); border: 1px solid %(border); border-radius: 8px;
+    padding: 7px 10px; selection-background-color: %(primary);
+}
+QLineEdit:focus { border: 1px solid %(primary); }
+QStatusBar { background: %(bg); color: %(muted); border-top: 1px solid %(border); }
+QStatusBar::item { border: none; }
+QSplitter::handle { background: %(border); }
+QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
+QScrollBar::handle:vertical { background: %(border); border-radius: 5px; min-height: 24px; }
+QScrollBar::handle:vertical:hover { background: #4a4d52; }
+QScrollBar:horizontal { background: transparent; height: 10px; margin: 2px; }
+QScrollBar::handle:horizontal { background: %(border); border-radius: 5px; min-width: 24px; }
+QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
+)QSS");
+
+    QColor navSel(Color::Primary);
+    navSel.setAlpha(38);
+
+    return QString(sheet)
+        .replace("%(bg)", Color::Bg)
+        .replace("%(panelHover)", Color::PanelHover)
+        .replace("%(panelAlt)", Color::PanelAlt)
+        .replace("%(panel)", Color::Panel)
+        .replace("%(border)", Color::Border)
+        .replace("%(primaryHover)", Color::PrimaryHover)
+        .replace("%(primary)", Color::Primary)
+        .replace("%(textSecondary)", Color::TextSecondary)
+        .replace("%(text)", Color::TextPrimary)
+        .replace("%(muted)", Color::Muted)
+        .replace("%(navSel)", QString("#2d3340"));
+}
 
 void applyModernTheme(QApplication& app)
 {
@@ -59,100 +180,24 @@ void applyModernTheme(QApplication& app)
     app.setFont(uiFont(10));
 
     QPalette p;
-    p.setColor(QPalette::Window, QColor(kBg));
-    p.setColor(QPalette::WindowText, QColor(kText));
-    p.setColor(QPalette::Base, QColor(kPanel));
-    p.setColor(QPalette::AlternateBase, QColor(kPanel2));
-    p.setColor(QPalette::Text, QColor(kText));
-    p.setColor(QPalette::Button, QColor(kPanel));
-    p.setColor(QPalette::ButtonText, QColor(kText));
-    p.setColor(QPalette::ToolTipBase, QColor(kPanel));
-    p.setColor(QPalette::ToolTipText, QColor(kText));
-    p.setColor(QPalette::Highlight, QColor(kAccent));
+    p.setColor(QPalette::Window, QColor(Color::Bg));
+    p.setColor(QPalette::WindowText, QColor(Color::TextPrimary));
+    p.setColor(QPalette::Base, QColor(Color::Panel));
+    p.setColor(QPalette::AlternateBase, QColor(Color::PanelAlt));
+    p.setColor(QPalette::Text, QColor(Color::TextPrimary));
+    p.setColor(QPalette::Button, QColor(Color::Panel));
+    p.setColor(QPalette::ButtonText, QColor(Color::TextPrimary));
+    p.setColor(QPalette::ToolTipBase, QColor(Color::Panel));
+    p.setColor(QPalette::ToolTipText, QColor(Color::TextPrimary));
+    p.setColor(QPalette::Highlight, QColor(Color::Primary));
     p.setColor(QPalette::HighlightedText, QColor("#ffffff"));
-    p.setColor(QPalette::PlaceholderText, QColor(kMuted));
-    p.setColor(QPalette::Disabled, QPalette::Text, QColor(kMuted));
-    p.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(kMuted));
-    p.setColor(QPalette::Link, QColor(kAccent));
+    p.setColor(QPalette::PlaceholderText, QColor(Color::Muted));
+    p.setColor(QPalette::Disabled, QPalette::Text, QColor(Color::Muted));
+    p.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(Color::Muted));
+    p.setColor(QPalette::Link, QColor(Color::Primary));
     app.setPalette(p);
 
-    app.setStyleSheet(QString(R"(
-        QWidget { color: %(text); }
-        QMainWindow, QDialog { background: %(bg); }
-
-        #header { background: %(bg); border-bottom: 1px solid %(border); }
-        #appTitle { font-size: 17px; font-weight: 600; }
-        #headerStatus { color: %(muted); font-size: 12px; }
-
-        QPushButton#primaryBtn {
-            background: %(accent); color: #ffffff; border: none;
-            border-radius: 6px; padding: 7px 16px; font-weight: 600;
-        }
-        QPushButton#primaryBtn:hover { background: #4b8ef7; }
-        QPushButton#primaryBtn:disabled { background: %(border); color: %(muted); }
-
-        #statCard {
-            background: %(panel); border: 1px solid %(border);
-            border-radius: 10px;
-        }
-        #statValue { font-size: 25px; font-weight: 700; }
-        #statCaption { color: %(muted); font-size: 10px; text-transform: uppercase;
-                       letter-spacing: 0.8px; }
-
-        QListWidget#nav {
-            background: %(bg); border: none; border-right: 1px solid %(border);
-            outline: 0; padding: 8px 6px;
-        }
-        QListWidget#nav::item {
-            padding: 9px 14px; border-radius: 7px; margin: 2px 0; color: %(muted);
-            font-size: 13px;
-        }
-        QListWidget#nav::item:hover { background: %(panel2); color: %(text); }
-        QListWidget#nav::item:selected {
-            background: %(panel); color: %(text); font-weight: 600;
-            border-left: 3px solid %(accent);
-        }
-
-        QStackedWidget > QWidget { background: %(bg); }
-
-        QTreeWidget, QTableWidget {
-            background: %(panel); alternate-background-color: %(panel2);
-            border: 1px solid %(border); border-radius: 10px;
-            gridline-color: transparent; outline: 0;
-        }
-        QTreeWidget::item, QTableWidget::item { padding: 6px 8px; }
-        QTreeWidget::item:selected, QTableWidget::item:selected {
-            background: %(accent); color: #ffffff;
-        }
-        QHeaderView::section {
-            background: %(panel); color: %(muted); border: none;
-            border-bottom: 1px solid %(border); padding: 9px 8px; font-weight: 600;
-            font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
-        }
-        QTreeView::branch { background: %(panel); }
-
-        QLineEdit {
-            background: %(panel2); border: 1px solid %(border); border-radius: 7px;
-            padding: 7px 10px; selection-background-color: %(accent);
-        }
-        QLineEdit:focus { border: 1px solid %(accent); }
-
-        QToolBar { background: %(bg); border: none; spacing: 8px; padding: 6px 12px; }
-        QStatusBar { background: %(bg); color: %(muted); border-top: 1px solid %(border); }
-        QScrollBar:vertical { background: transparent; width: 10px; margin: 2px; }
-        QScrollBar::handle:vertical { background: %(border); border-radius: 5px; min-height: 24px; }
-        QScrollBar::handle:vertical:hover { background: #4a4d52; }
-        QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
-        QScrollBar:horizontal { background: transparent; height: 10px; margin: 2px; }
-        QScrollBar::handle:horizontal { background: %(border); border-radius: 5px; min-width: 24px; }
-    )")
-                           .replace("%(accent)", kAccent)
-                           .replace("%(bg)", kBg)
-                           .replace("%(panel2)", kPanel2)
-                           .replace("%(panel)", kPanel)
-                           .replace("%(border)", kBorder)
-                           .replace("%(muted)", kMuted)
-                           .replace("%(text)", kText));
+    app.setStyleSheet(styleSheet());
 }
 
 } // namespace dm

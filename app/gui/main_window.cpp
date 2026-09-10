@@ -1,13 +1,17 @@
 #include "gui/main_window.h"
-#include "gui/theme.h"
 
-#include <QFrame>
+#include "gui/pages/environment_page.h"
+#include "gui/pages/placeholder_page.h"
+#include "gui/theme.h"
+#include "gui/widgets/icons.h"
+#include "gui/widgets/sidebar.h"
+#include "gui/widgets/summary_card.h"
+#include "gui/widgets/top_bar.h"
+
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
-#include <QListWidget>
-#include <QPushButton>
 #include <QStackedWidget>
 #include <QStatusBar>
 #include <QTableWidget>
@@ -24,7 +28,6 @@ static QTreeWidget* makeTree(const QStringList& headers)
     auto* t = new QTreeWidget;
     t->setColumnCount(headers.size());
     t->setHeaderLabels(headers);
-    t->setRootIsDecorated(true);
     t->setUniformRowHeights(true);
     t->setAlternatingRowColors(true);
     t->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
@@ -43,25 +46,17 @@ static QTableWidget* makeTable(const QStringList& headers)
     t->setSelectionBehavior(QAbstractItemView::SelectRows);
     t->setEditTriggers(QAbstractItemView::NoEditTriggers);
     t->horizontalHeader()->setStretchLastSection(true);
-    t->verticalHeader()->setDefaultSectionSize(30);
+    t->verticalHeader()->setDefaultSectionSize(Metric::RowHeight);
     return t;
 }
 
-static QTreeWidgetItem* section(QTreeWidget* t, const QString& name)
+static QWidget* pad(QWidget* content)
 {
-    auto* it = new QTreeWidgetItem(t, {name});
-    QFont f = it->font(0);
-    f.setBold(true);
-    it->setFont(0, f);
-    it->setFirstColumnSpanned(true);
-    it->setExpanded(true);
-    return it;
-}
-
-static void kv(QTreeWidgetItem* parent, const QString& k, const QString& v)
-{
-    auto* it = new QTreeWidgetItem(parent, {k, v});
-    it->setFont(1, monoFont());
+    auto* page = new QWidget;
+    auto* lay = new QVBoxLayout(page);
+    lay->setContentsMargins(Metric::OuterMargin, 14, Metric::OuterMargin, Metric::OuterMargin);
+    lay->addWidget(content);
+    return page;
 }
 
 // ---------------------------------------------------------------- window
@@ -69,7 +64,7 @@ static void kv(QTreeWidgetItem* parent, const QString& k, const QString& v)
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 {
     setWindowTitle("DevManager");
-    resize(1120, 720);
+    resize(1240, 760);
     buildUi();
 
     connect(&m_controller, &AppController::scanStarted, this, &MainWindow::onScanStarted);
@@ -77,140 +72,142 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     m_controller.scanEnvironment();
 }
 
-QWidget* MainWindow::buildHeader()
-{
-    auto* bar = new QFrame;
-    bar->setObjectName("header");
-    auto* lay = new QHBoxLayout(bar);
-    lay->setContentsMargins(20, 14, 16, 14);
-    lay->setSpacing(12);
-
-    auto* title = new QLabel("DevManager");
-    title->setObjectName("appTitle");
-    title->setFont(uiFont(17, QFont::DemiBold, /*display=*/true));
-
-    m_headerStatus = new QLabel("idle");
-    m_headerStatus->setObjectName("headerStatus");
-
-    m_scanButton = new QPushButton("Rescan");
-    m_scanButton->setObjectName("primaryBtn");
-    m_scanButton->setCursor(Qt::PointingHandCursor);
-    connect(m_scanButton, &QPushButton::clicked, &m_controller, &AppController::scanEnvironment);
-
-    lay->addWidget(title);
-    lay->addStretch(1);
-    lay->addWidget(m_headerStatus);
-    lay->addWidget(m_scanButton);
-    return bar;
-}
-
-static QFrame* statCard(const QString& caption, QLabel** valueOut)
-{
-    auto* card = new QFrame;
-    card->setObjectName("statCard");
-    auto* lay = new QVBoxLayout(card);
-    lay->setContentsMargins(16, 12, 16, 12);
-    lay->setSpacing(2);
-    auto* value = new QLabel("-");
-    value->setObjectName("statValue");
-    value->setFont(uiFont(25, QFont::Bold, /*display=*/true));
-    auto* cap = new QLabel(caption);
-    cap->setObjectName("statCaption");
-    lay->addWidget(value);
-    lay->addWidget(cap);
-    *valueOut = value;
-    return card;
-}
-
-QWidget* MainWindow::buildStatRow()
-{
-    auto* row = new QWidget;
-    auto* lay = new QHBoxLayout(row);
-    lay->setContentsMargins(20, 16, 20, 8);
-    lay->setSpacing(12);
-    lay->addWidget(statCard("Tools", &m_statTools));
-    lay->addWidget(statCard("Skills", &m_statSkills));
-    lay->addWidget(statCard("Linked locations", &m_statLinked));
-    lay->addWidget(statCard("Packages", &m_statPackages));
-    lay->addStretch(1);
-    return row;
-}
-
-QWidget* MainWindow::wrapPage(QWidget* content)
-{
-    auto* page = new QWidget;
-    auto* lay = new QVBoxLayout(page);
-    lay->setContentsMargins(20, 12, 20, 16);
-    lay->addWidget(content);
-    return page;
-}
-
 void MainWindow::buildUi()
 {
-    m_envTree = makeTree({"Item", "Value"});
-    m_skillTree = makeTree({"Skill / Host", "Classification", "Link", "Target", "Git"});
-    m_pluginTree = makeTree({"Plugin / Host", "Classification", "Link", "Path"});
+    // --- top bar
+    m_topBar = new TopBar;
+    connect(m_topBar, &TopBar::rescanRequested, &m_controller, &AppController::scanEnvironment);
+    connect(m_topBar, &TopBar::searchChanged, this, [this](const QString& t) {
+        if (m_sidebar->current() == "packages")
+            filterPackages(t);
+    });
 
-    // packages page: filter + table
-    auto* pkgPage = new QWidget;
-    auto* pkgLay = new QVBoxLayout(pkgPage);
-    pkgLay->setContentsMargins(0, 0, 0, 0);
-    pkgLay->setSpacing(10);
-    m_packageFilter = new QLineEdit;
-    m_packageFilter->setPlaceholderText("Filter packages by name...");
-    m_packageFilter->setClearButtonEnabled(true);
-    connect(m_packageFilter, &QLineEdit::textChanged, this, &MainWindow::filterPackages);
-    m_packageTable = makeTable({"Manager", "Name", "Version"});
-    pkgLay->addWidget(m_packageFilter);
-    pkgLay->addWidget(m_packageTable);
+    // --- sidebar
+    m_sidebar = new Sidebar;
+    m_sidebar->addItem("environment", "environment", "Environment");
+    m_sidebar->addItem("skills", "skills", "Skills");
+    m_sidebar->addItem("plugins", "plugins", "Plugins");
+    m_sidebar->addItem("packages", "packages", "Packages");
+    m_sidebar->addItem("envvars", "env", "Env Vars");
+    m_sidebar->addSection("Migration");
+    m_sidebar->addItem("snapshots", "snapshots", "Snapshots");
+    m_sidebar->addItem("restore", "restore", "Restore");
+    m_sidebar->addItem("settings", "settings", "Settings");
+    m_sidebar->addFooterItem("docs", "docs", "Documentation");
+    m_sidebar->addFooterItem("about", "about", "About");
+    connect(m_sidebar, &Sidebar::selected, this, &MainWindow::onNavSelected);
 
-    m_envVarTable = makeTable({"Name", "Value (masked)"});
+    // --- summary cards
+    m_cardTools = new SummaryCard("cpu", "Tools", Color::Primary);
+    m_cardSkills = new SummaryCard("skills", "Skills", Color::Success);
+    m_cardLinked = new SummaryCard("plugins", "Linked locations", Color::Purple);
+    m_cardPackages = new SummaryCard("packages", "Packages", Color::Amber);
 
+    auto* cardRow = new QWidget;
+    auto* cardLay = new QHBoxLayout(cardRow);
+    cardLay->setContentsMargins(Metric::OuterMargin, 14, Metric::OuterMargin, 0);
+    cardLay->setSpacing(Metric::Gap);
+    for (auto* c : {m_cardTools, m_cardSkills, m_cardLinked, m_cardPackages})
+        cardLay->addWidget(c);
+
+    // --- pages
     m_stack = new QStackedWidget;
-    m_stack->addWidget(wrapPage(m_envTree));
-    m_stack->addWidget(wrapPage(m_skillTree));
-    m_stack->addWidget(wrapPage(m_pluginTree));
-    m_stack->addWidget(wrapPage(pkgPage));
-    m_stack->addWidget(wrapPage(m_envVarTable));
+    m_envPage = new EnvironmentPage;
+    m_stack->addWidget(m_envPage);                         // 0 environment
+    m_stack->addWidget(buildSkillsPage());                 // 1 skills
+    m_stack->addWidget(buildPluginsPage());                // 2 plugins
+    m_stack->addWidget(buildPackagesPage());               // 3 packages
+    m_stack->addWidget(buildEnvVarsPage());                // 4 envvars
+    m_stack->addWidget(new PlaceholderPage(                // 5 snapshots
+        "snapshots", "Snapshots",
+        "Snapshot planning arrives in a later phase."));
+    m_stack->addWidget(new PlaceholderPage(                // 6 restore
+        "restore", "Restore",
+        "Restore (dry-run first) arrives in a later phase."));
+    m_stack->addWidget(new PlaceholderPage(                // 7 settings
+        "settings", "Settings", "Nothing to configure yet."));
 
-    m_nav = new QListWidget;
-    m_nav->setObjectName("nav");
-    m_nav->setFixedWidth(190);
-    m_nav->setFrameShape(QFrame::NoFrame);
-    for (const QString& label : {"Environment", "Skills", "Plugins", "Packages", "Env Vars"})
-        m_nav->addItem(label);
-    connect(m_nav, &QListWidget::currentRowChanged, m_stack, &QStackedWidget::setCurrentIndex);
-    m_nav->setCurrentRow(0);
+    // --- assemble
+    auto* rightSide = new QWidget;
+    auto* rightLay = new QVBoxLayout(rightSide);
+    rightLay->setContentsMargins(0, 0, 0, 0);
+    rightLay->setSpacing(0);
+    rightLay->addWidget(cardRow);
+    rightLay->addWidget(m_stack, 1);
 
     auto* body = new QWidget;
     auto* bodyLay = new QHBoxLayout(body);
     bodyLay->setContentsMargins(0, 0, 0, 0);
     bodyLay->setSpacing(0);
-    bodyLay->addWidget(m_nav);
-    bodyLay->addWidget(m_stack, 1);
+    bodyLay->addWidget(m_sidebar);
+    bodyLay->addWidget(rightSide, 1);
 
     auto* central = new QWidget;
     auto* outer = new QVBoxLayout(central);
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(0);
-    outer->addWidget(buildHeader());
-    outer->addWidget(buildStatRow());
+    outer->addWidget(m_topBar);
     outer->addWidget(body, 1);
     setCentralWidget(central);
 
     statusBar()->showMessage("ready");
+    m_sidebar->setCurrent("environment");
+}
+
+QWidget* MainWindow::buildSkillsPage()
+{
+    m_skillTree = makeTree({"Skill / Host", "Type", "Link", "Target", "Git"});
+    return pad(m_skillTree);
+}
+
+QWidget* MainWindow::buildPluginsPage()
+{
+    m_pluginTree = makeTree({"Plugin / Host", "Type", "Link", "Path"});
+    return pad(m_pluginTree);
+}
+
+QWidget* MainWindow::buildPackagesPage()
+{
+    auto* page = new QWidget;
+    auto* lay = new QVBoxLayout(page);
+    lay->setContentsMargins(Metric::OuterMargin, 14, Metric::OuterMargin, Metric::OuterMargin);
+    lay->setSpacing(10);
+    m_packageFilter = new QLineEdit;
+    m_packageFilter->setPlaceholderText("Filter packages by name...");
+    m_packageFilter->setClearButtonEnabled(true);
+    connect(m_packageFilter, &QLineEdit::textChanged, this, &MainWindow::filterPackages);
+    m_packageTable = makeTable({"Manager", "Name", "Version"});
+    lay->addWidget(m_packageFilter);
+    lay->addWidget(m_packageTable);
+    return page;
+}
+
+QWidget* MainWindow::buildEnvVarsPage()
+{
+    m_envVarTable = makeTable({"Name", "Value (masked)"});
+    return pad(m_envVarTable);
+}
+
+void MainWindow::selectPage(const QString& id) { m_sidebar->setCurrent(id); }
+
+void MainWindow::onNavSelected(const QString& id)
+{
+    static const QHash<QString, int> map{
+        {"environment", 0}, {"skills", 1}, {"plugins", 2}, {"packages", 3},
+        {"envvars", 4}, {"snapshots", 5}, {"restore", 6}, {"settings", 7}};
+    if (map.contains(id))
+        m_stack->setCurrentIndex(map.value(id));
 }
 
 void MainWindow::onScanStarted()
 {
-    m_scanButton->setEnabled(false);
-    m_headerStatus->setText("scanning...");
+    m_topBar->setBusy(true);
     statusBar()->showMessage("scanning environment (read-only)...");
 }
 
 void MainWindow::onScanFinished(const EnvironmentInventory& inv)
 {
-    populateEnvironment(inv);
+    m_envPage->setInventory(inv);
     populateSkills(inv);
     populatePlugins(inv);
     populatePackages(inv);
@@ -221,45 +218,29 @@ void MainWindow::onScanFinished(const EnvironmentInventory& inv)
         for (const auto& l : s.locations)
             if (l.link.isLink) ++linked;
 
-    m_statTools->setText(QString::number(inv.tools.size()));
-    m_statSkills->setText(QString::number(inv.skills.size()));
-    m_statLinked->setText(QString::number(linked));
-    m_statPackages->setText(QString::number(inv.globalPackages.size()));
-
-    m_scanButton->setEnabled(true);
-    m_headerStatus->setText("scanned " + inv.capturedAt.left(19).replace('T', ' '));
-    statusBar()->showMessage(inv.machine + "  ·  " + inv.osCaption);
-}
-
-void MainWindow::populateEnvironment(const EnvironmentInventory& inv)
-{
-    m_envTree->clear();
-
-    auto* m = section(m_envTree, "Machine");
-    kv(m, "Machine", inv.machine);
-    kv(m, "User profile", inv.userProfile);
-    kv(m, "OS", inv.osCaption + "  (" + inv.osVersion + ")");
-
-    auto* tools = section(m_envTree, "Tools");
+    int toolsOk = 0;
     for (auto it = inv.tools.constBegin(); it != inv.tools.constEnd(); ++it)
-        kv(tools, it.key(), it.value().isEmpty() ? "(not found)" : it.value());
+        if (!it.value().trimmed().isEmpty()) ++toolsOk;
 
-    auto* build = section(m_envTree, "Build");
-    kv(build, "Qt", inv.qt);
-    kv(build, "Visual Studio", inv.visualStudio);
+    m_cardTools->setValue(QString::number(inv.tools.size()));
+    m_cardTools->setHint(QString("%1 installed").arg(toolsOk));
+    m_cardSkills->setValue(QString::number(inv.skills.size()));
+    m_cardLinked->setValue(QString::number(linked));
+    m_cardPackages->setValue(QString::number(inv.globalPackages.size()));
 
-    auto* wsl = section(m_envTree, "WSL");
-    kv(wsl, "Installed", inv.wsl.installed ? "yes" : "no");
-    for (const auto& d : inv.wsl.distributions)
-        kv(wsl, d.name, QString("%1  (v%2)").arg(d.state).arg(d.version));
+    m_sidebar->setCount("skills", inv.skills.size());
+    m_sidebar->setCount("plugins", inv.plugins.size());
+    m_sidebar->setCount("packages", inv.globalPackages.size());
 
-    m_envTree->expandAll();
+    m_topBar->setBusy(false);
+    m_topBar->setLastScanned(inv.capturedAt);
+    statusBar()->showMessage(inv.machine + "  •  " + inv.osCaption);
 }
 
 void MainWindow::populateSkills(const EnvironmentInventory& inv)
 {
     m_skillTree->clear();
-    QColor accentColor(QString::fromLatin1(accentHex()));
+    const QColor accentColor(QString::fromLatin1(accentHex()));
     const QBrush accent(accentColor);
 
     for (const auto& s : inv.skills) {
@@ -293,8 +274,10 @@ void MainWindow::populatePlugins(const EnvironmentInventory& inv)
 {
     m_pluginTree->clear();
     if (inv.plugins.isEmpty()) {
-        auto* none = new QTreeWidgetItem(m_pluginTree, {"(none discovered)"});
-        none->setForeground(0, QColor("#9aa0a6"));
+        auto* none = new QTreeWidgetItem(m_pluginTree, {"No plugins discovered."});
+        none->setForeground(0, QColor(Color::Muted));
+        auto* hint = new QTreeWidgetItem(m_pluginTree, {"Plugin roots were scanned successfully."});
+        hint->setForeground(0, QColor(Color::Muted));
         return;
     }
     for (const auto& p : inv.plugins) {

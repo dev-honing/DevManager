@@ -11,6 +11,7 @@ public:
 
     // sub-scans, exposed for targeted testing / reuse
     static QMap<QString, QString> scanTools();
+    static QMap<QString, QString> scanToolPaths();
     static QString scanQt();
     static QString scanVisualStudio();
     static WslInfo scanWsl();

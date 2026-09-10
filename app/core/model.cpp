@@ -115,6 +115,7 @@ QJsonObject EnvironmentInventory::toJson() const
                    {"is64Bit", os64Bit},
                }},
         {"tools", mapToJson(tools)},
+        {"toolPaths", mapToJson(toolPaths)},
         {"qt", qt.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(qt)},
         {"visualStudio", visualStudio.isEmpty() ? QJsonValue(QJsonValue::Null)
                                                 : QJsonValue(visualStudio)},
