@@ -164,6 +164,32 @@ generated, move the covered entries into that revision and clear them here.
   - §16 summary: DevManager now covers both the migration track AND the
     container-isolation track.
 
+### 8. P5 잔여 — `.omniroute` + `.headroom` restore verified; **P5 fully done**
+- Not a code change; the final P5 validation (started in #3). All six backup
+  roots now verified via a real `--restore --apply`.
+- **`~/.omniroute/storage.sqlite` — VERIFIED.** Scoped snapshot → `--restore
+  --apply` → `state=done, restored=1`. Post-restore SHA-256 identical to pre
+  and to an independent `tar` safety backup; `--verify` 1 ok / 0 bad;
+  `pre-restore-*` holds the original; OmniRoute `start`→`stop` on the restored
+  DB works and leaves the hash unchanged.
+- **`~/.headroom` (config + deploy) — VERIFIED (needed Headroom stopped).**
+  While Headroom runs, restore fails **cleanly at the preserve step** —
+  `fs::moveAside(~/.headroom/deploy)` can't move the dir because
+  `runner.start.lock` / `runner.pid` / `runner.log` are held open by the
+  proxy → full rollback, `restored=0`, nothing changed (rollback path
+  exercised on a real service). With the user stopping Headroom from an
+  elevated shell (disable `headroom-init-user-startup` + `-health` tasks,
+  kill the 8787 proxy): scoped snapshot → `--restore --apply` →
+  `state=done, restored=2`; all 9 files (config + 8 deploy) byte-identical
+  pre/post; `--verify` 2 ok / 0 bad; `pre-restore-*` holds the originals.
+- Both restores reported the 3 gpt-image links as
+  "skipped (outside restored scope)" — P6 scoping confirmed on real restores.
+- **Docx sections to touch:** §5.3 실환경 검증 (all six roots verified;
+  `.headroom` note: a running task-supervised service blocks preserve of its
+  own deploy dir → stop it first, rollback is clean either way), §12.1
+  roadmap (**P5 → done**), §12.2 (drop the P5-잔여 row), §14 주의사항
+  (running task-supervised service ⇒ stop before restoring its deploy dir).
+
 ---
 
 ## How to use this file
