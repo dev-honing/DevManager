@@ -39,6 +39,7 @@ struct ServiceSpec {
     QStringList cliCheck;        // non-empty => run it; exit 0 + output => running
     bool wslRunning = false;     // true => `wsl -l -q --running` non-empty => running
     ServiceLifecycleSpec lifecycle;
+    bool snapshotBlocker = false; // holds files under a backup root open => stop before a snapshot
 };
 
 struct PackageManagerSpec {

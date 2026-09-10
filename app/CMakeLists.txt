@@ -24,6 +24,7 @@ add_library(devmanager_core STATIC
     core/snapshot/snapshot_preview.cpp
     core/snapshot/restore_preview.cpp
     core/snapshot/snapshot_executor.cpp
+    core/snapshot/snapshot_coordinator.cpp
     core/snapshot/restore_executor.cpp
 )
 target_include_directories(devmanager_core PUBLIC core)
@@ -81,4 +82,8 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_restore_executor tests/tst_restore_executor.cpp)
     target_link_libraries(tst_restore_executor PRIVATE devmanager_core Qt6::Test)
     add_test(NAME restore_executor COMMAND tst_restore_executor)
+
+    add_executable(tst_snapshot_coordinator tests/tst_snapshot_coordinator.cpp)
+    target_link_libraries(tst_snapshot_coordinator PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME snapshot_coordinator COMMAND tst_snapshot_coordinator)
 endif()

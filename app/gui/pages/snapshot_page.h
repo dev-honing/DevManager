@@ -2,6 +2,7 @@
 #include <QWidget>
 #include <QFutureWatcher>
 
+#include "core/snapshot/snapshot_coordinator.h"
 #include "core/snapshot/snapshot_executor.h"
 #include "core/snapshot/snapshot_preview.h"
 
@@ -9,6 +10,7 @@ class QTableWidget;
 class QLabel;
 class QPushButton;
 class QProgressBar;
+class QCheckBox;
 
 namespace dm {
 
@@ -32,12 +34,14 @@ private:
     QList<ServiceState> m_services;
     QString m_backupsDir;
     SnapshotPreview m_preview;
+    QStringList m_serviceNotes;   // stop/restart notes from the last consistent run
 
     QFutureWatcher<SnapshotPreview> m_watcher;
     QFutureWatcher<SnapshotResult> m_execWatcher;
 
     QPushButton* m_dryBtn = nullptr;
     QPushButton* m_createBtn = nullptr;
+    QCheckBox* m_stopFirst = nullptr;   // consistent snapshot: stop blockers first
     QLabel* m_summary = nullptr;
     QLabel* m_blockers = nullptr;
     QProgressBar* m_progress = nullptr;
