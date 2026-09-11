@@ -64,6 +64,16 @@ QWidget* badgeCell(const QString& status)
     return w;
 }
 
+// size a table to fit `rowCount` rows without an inner scrollbar, clamped to
+// [minH, maxH] so a long list still scrolls instead of pushing the rest of
+// the page off-screen.
+void fitTableHeight(QTableWidget* t, int rowCount, int minH, int maxH)
+{
+    const int header = t->horizontalHeader()->height();
+    const int wanted = header + qMax(rowCount, 1) * Metric::RowHeight + 6;
+    t->setFixedHeight(qBound(minH, wanted, maxH));
+}
+
 } // namespace
 
 SettingsPage::SettingsPage(QWidget* parent) : QWidget(parent)
@@ -101,7 +111,6 @@ SettingsPage::SettingsPage(QWidget* parent) : QWidget(parent)
     m_healthTable->setColumnWidth(0, 100);
     m_healthTable->setColumnWidth(1, 140);
     m_healthTable->setColumnWidth(2, 100);
-    m_healthTable->setMaximumHeight(220);
     lay->addWidget(m_healthTable);
 
     // ---------------------------------------------------- Service details
@@ -249,6 +258,7 @@ void SettingsPage::renderHealth(const HealthReport& r)
         detail->setForeground(QColor(Color::Muted));
         m_healthTable->setItem(i, 3, detail);
     }
+    fitTableHeight(m_healthTable, r.items.size(), 120, 400);
 }
 
 // -------------------------------------------------------------- Bootstrap
@@ -407,11 +417,7 @@ void SettingsPage::renderServiceDetails(const QList<ServiceDetail>& details)
         m_serviceDetailTable->setItem(i, 3, w);
     }
 
-    // size to fit every row (no inner scrollbar), clamped to a sane range
-    const int header = m_serviceDetailTable->horizontalHeader()->height();
-    const int rows = qMax(details.size(), 1);
-    m_serviceDetailTable->setFixedHeight(
-        qBound(120, header + rows * Metric::RowHeight + 6, 280));
+    fitTableHeight(m_serviceDetailTable, details.size(), 120, 280);
 }
 
 } // namespace dm
