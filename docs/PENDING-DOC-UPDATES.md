@@ -16,7 +16,7 @@ generated, move the covered entries into that revision and clear them here.
 ## Pending since v5
 
 ### 1. End-to-end migrate orchestrator (`Migrate`, `--migrate`)
-- Commit: `<fill on merge>` (branch `feat/migrate-orchestrator`)
+- Commit: `b43f8b2`, merge `f5b5c7c`
 - Closes the v5 §14.1 "선택 사항" item: bundle→unbundle→restore→health as one
   command instead of four.
 - `app/core/migrate.{h,cpp}`: `Migrate::run(bundleFile, outDir, apply)` calls
@@ -35,7 +35,7 @@ generated, move the covered entries into that revision and clear them here.
   §11 tests (add `tst_migrate`, 14 suites), README already updated.
 
 ### 2. GUI integration of Health / Bootstrap / Retention (new Settings page)
-- Commit: `<fill on merge>` (branch `feat/settings-gui`)
+- Commit: `025aca0`, merge `48167b0`
 - Replaces the empty "Settings" placeholder with `app/gui/pages/settings_page.{h,cpp}`,
   three sections in one page:
   - **Environment Health** — profile combo (built-in "All tools" + config
@@ -67,7 +67,7 @@ generated, move the covered entries into that revision and clear them here.
   screenshot-verified like other pages).
 
 ### 3. GUI integration of Project containers (new Projects page, P11)
-- Commit: `<fill on merge>` (branch `feat/projects-gui`)
+- Commit: `a1f6720`, merge `9a5a08d`
 - New core module `app/core/project/project_control.{h,cpp}` (`ProjectControl`):
   `writeFiles(spec, projectDir)` (the compose+devcontainer file I/O),
   `hasCompose(projectDir)`, `up(projectDir)`/`down(projectDir)` (blocking
