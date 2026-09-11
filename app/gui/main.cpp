@@ -45,12 +45,19 @@ int main(int argc, char** argv)
         const QString nav = (ni >= 0 && ni + 1 < args.size()) ? args.at(ni + 1) : QString();
         const bool dry = args.contains("--shot-dryrun");
         const bool create = args.contains("--shot-create");  // click a "Create ..." button
-        QTimer::singleShot(8000, &w, [&w, path, nav, dry, create] {
+        const int ci = args.indexOf("--shot-click");   // dev: click any button by visible text
+        const QString clickText = (ci >= 0 && ci + 1 < args.size()) ? args.at(ci + 1) : QString();
+        QTimer::singleShot(8000, &w, [&w, path, nav, dry, create, clickText] {
             if (!nav.isEmpty())
                 w.selectPage(nav);
             if (dry) {
                 for (auto* b : w.findChildren<QPushButton*>("dryCheckBtn"))
                     if (b->isVisible() && b->isEnabled())
+                        b->click();
+            }
+            if (!clickText.isEmpty()) {
+                for (auto* b : w.findChildren<QPushButton*>())
+                    if (b->isVisible() && b->isEnabled() && b->text().contains(clickText))
                         b->click();
             }
             if (create) {
@@ -66,7 +73,8 @@ int main(int argc, char** argv)
                 poll->start(300);
                 QObject::connect(poll, &QTimer::timeout, acceptModals);
             }
-            QTimer::singleShot(dry ? (create ? 30000 : 12000) : 400, &w, [&w, path] {
+            const int wait = create ? 30000 : (dry || !clickText.isEmpty()) ? 12000 : 400;
+            QTimer::singleShot(wait, &w, [&w, path] {
                 w.grab().save(path);
                 qApp->quit();
             });

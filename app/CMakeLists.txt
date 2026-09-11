@@ -58,13 +58,13 @@ add_executable(devmanager-gui WIN32
     gui/widgets/right_panel.cpp
     gui/widgets/tag_badge.cpp
     gui/pages/environment_page.cpp
-    gui/pages/placeholder_page.cpp
     gui/pages/skills_page.cpp
     gui/pages/plugins_page.cpp
     gui/pages/packages_page.cpp
     gui/pages/env_vars_page.cpp
     gui/pages/snapshot_page.cpp
     gui/pages/restore_page.cpp
+    gui/pages/settings_page.cpp
 )
 target_include_directories(devmanager-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(devmanager-gui PRIVATE
