@@ -5,6 +5,7 @@
 #include "gui/widgets/machine_card.h"
 #include "gui/widgets/segmented_control.h"
 #include "gui/widgets/status_badge.h"
+#include "gui/widgets/table_factory.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -119,17 +120,7 @@ EnvironmentPage::EnvironmentPage(QWidget* parent) : QWidget(parent)
     lay->addWidget(m_segments);
 
     // tools table
-    m_table = new QTableWidget;
-    m_table->setColumnCount(5);
-    m_table->setHorizontalHeaderLabels({"Name", "Version", "Status", "Path", ""});
-    m_table->verticalHeader()->setVisible(false);
-    m_table->setShowGrid(false);
-    m_table->setAlternatingRowColors(true);
-    m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_table->setSelectionMode(QAbstractItemView::NoSelection);
-    m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_table->setFocusPolicy(Qt::NoFocus);
-    m_table->verticalHeader()->setDefaultSectionSize(Metric::RowHeight + 4);
+    m_table = makeListTable({"Name", "Version", "Status", "Path", ""}, Metric::RowHeight + 4);
     auto* hh = m_table->horizontalHeader();
     hh->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     hh->setSectionResizeMode(1, QHeaderView::ResizeToContents);
@@ -139,7 +130,6 @@ EnvironmentPage::EnvironmentPage(QWidget* parent) : QWidget(parent)
     m_table->setColumnWidth(2, 104);
     m_table->setColumnWidth(4, 76);
     m_table->setWordWrap(false);
-    m_table->setTextElideMode(Qt::ElideMiddle);
     lay->addWidget(m_table, 1);
 }
 

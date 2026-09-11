@@ -1,8 +1,7 @@
 #include "snapshot/snapshot_diff.h"
 
-#include "json_io.h"
+#include "snapshot/snapshot_index.h"
 
-#include <QDir>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMap>
@@ -59,11 +58,11 @@ QString diffOne(const Comp& a, const Comp& b)
 DiffResult SnapshotDiff::compare(const QString& dirA, const QString& dirB)
 {
     DiffResult res;
-    const QJsonObject ma = json::read(QDir(dirA).filePath("manifest.json"));
-    const QJsonObject mb = json::read(QDir(dirB).filePath("manifest.json"));
+    QString errA, errB;
+    const QJsonObject ma = SnapshotIndex::readManifest(dirA, &errA);
+    const QJsonObject mb = SnapshotIndex::readManifest(dirB, &errB);
     if (ma.isEmpty() || mb.isEmpty()) {
-        res.error = ma.isEmpty() ? "manifest A missing or unreadable"
-                                 : "manifest B missing or unreadable";
+        res.error = ma.isEmpty() ? "manifest A " + errA : "manifest B " + errB;
         return res;
     }
     res.stampA = ma.value("stamp").toString();

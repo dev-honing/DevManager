@@ -34,11 +34,7 @@ QList<SnapshotSummary> SnapshotIndex::list(const QString& backupsDir)
         const QString name = e.fileName();
         if (name.startsWith("pre-restore") || name.contains("relink"))
             continue;
-        const QString manifest = e.filePath() + "/manifest.json";
-        if (!QFileInfo::exists(manifest))
-            continue;
-
-        const QJsonObject m = json::read(manifest);
+        const QJsonObject m = readManifest(e.filePath());
         if (m.isEmpty())
             continue;
 
@@ -52,6 +48,20 @@ QList<SnapshotSummary> SnapshotIndex::list(const QString& backupsDir)
         out << s;
     }
     return out;
+}
+
+QJsonObject SnapshotIndex::readManifest(const QString& snapshotDir, QString* error)
+{
+    const QString path = QDir(snapshotDir).filePath("manifest.json");
+    if (!QFileInfo::exists(path)) {
+        if (error) *error = "manifest.json missing or unreadable";
+        return {};
+    }
+    QString parseErr;
+    const QJsonObject m = json::read(path, &parseErr);
+    if (m.isEmpty() && error)
+        *error = "manifest.json missing or unreadable";
+    return m;
 }
 
 } // namespace dm

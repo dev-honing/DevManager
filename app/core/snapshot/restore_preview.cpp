@@ -2,6 +2,7 @@
 
 #include "json_io.h"
 #include "path_util.h"
+#include "snapshot/snapshot_index.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -28,16 +29,9 @@ RestorePreview RestorePlanner::compute(const QString& snapshotDir,
 {
     RestorePreview pv;
 
-    const QString manifestPath = QDir(snapshotDir).filePath("manifest.json");
-    if (!QFileInfo::exists(manifestPath)) {
-        pv.error = "manifest.json not found in " + snapshotDir;
+    const QJsonObject m = SnapshotIndex::readManifest(snapshotDir, &pv.error);
+    if (m.isEmpty())
         return pv;
-    }
-    const QJsonObject m = json::read(manifestPath);
-    if (m.isEmpty()) {
-        pv.error = "manifest.json could not be parsed";
-        return pv;
-    }
 
     pv.schemaVersion = m.value("schemaVersion").toInt();
     pv.snapshotStamp = m.value("stamp").toString(QFileInfo(snapshotDir).fileName());
