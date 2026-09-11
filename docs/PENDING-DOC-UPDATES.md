@@ -95,8 +95,7 @@ generated, move the covered entries into that revision and clear them here.
   screenshot passes against a real project folder: Generate Files (wrote
   `docker-compose.yml`/`devcontainer.json`), Up (real `docker compose up -d` --
   network + 4 volumes + container created and started), Down (container +
-  network removed, volumes kept). Commit `<fill on merge>` (branch
-  `chore/verify-projects-gui-up-down`).
+  network removed, volumes kept). Commit `9a0d005`, merge `e11ad21`.
 - **Docx sections to touch:** §2.1 module table (add `project_control`), §2.2
   GUI (Projects page), §11 컨테이너 트랙 (note the GUI path alongside the CLI),
   §13 tests (14 suites, add `tst_project_control`).
