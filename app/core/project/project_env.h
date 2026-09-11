@@ -31,6 +31,10 @@ public:
 
     static QString composeYaml(const ProjectSpec& s);
     static QString devcontainerJson(const ProjectSpec& s);
+
+    // Type keys found in project-types.json (falls back to {"cpp","nextjs"}
+    // when the file is absent -- those are the ones defaults() can resolve).
+    static QStringList availableTypes();
 };
 
 } // namespace dm

@@ -9,7 +9,7 @@
 #include "health_check.h"
 #include "json_io.h"
 #include "migrate.h"
-#include "process_runner.h"
+#include "project/project_control.h"
 #include "project/project_env.h"
 #include "scan/env_scanner.h"
 #include "service/service_lifecycle.h"
@@ -158,7 +158,6 @@ int main(int argc, char** argv)
     // ---- project container setup (P11.2/11.3) ------------------------
     if (parser.isSet(projInitOpt) || parser.isSet(projUpOpt) || parser.isSet(projDownOpt)) {
         const QString cwd = QDir::currentPath();
-        const QString composePath = cwd + "/.devmanager/docker-compose.yml";
 
         if (parser.isSet(projInitOpt)) {
             const dm::ProjectSpec s = dm::ProjectEnv::resolve(
@@ -172,11 +171,9 @@ int main(int argc, char** argv)
                     << "' -- no container, use --health --profile " << s.hostProfile << "\n";
                 return 0;
             }
-            QString e;
-            if (!dm::json::writeText(composePath, dm::ProjectEnv::composeYaml(s), &e)
-                || !dm::json::writeText(cwd + "/.devcontainer/devcontainer.json",
-                                        dm::ProjectEnv::devcontainerJson(s), &e)) {
-                err << "error: " << e << "\n";
+            const dm::ProjectWriteResult w = dm::ProjectControl::writeFiles(s, cwd);
+            if (!w.ok) {
+                err << "error: " << w.error << "\n";
                 return 1;
             }
             err << "wrote .devmanager/docker-compose.yml + .devcontainer/devcontainer.json\n"
@@ -185,16 +182,14 @@ int main(int argc, char** argv)
             return 0;
         }
 
-        if (!QFileInfo::exists(composePath)) {
+        if (!dm::ProjectControl::hasCompose(cwd)) {
             err << "error: no .devmanager/docker-compose.yml -- run --project-init first\n";
             return 1;
         }
-        const QStringList args = parser.isSet(projUpOpt)
-                                     ? QStringList{"compose", "-f", composePath, "up", "-d"}
-                                     : QStringList{"compose", "-f", composePath, "down"};
-        const dm::ProcessResult r = dm::ProcessRunner::run("docker", args, 120000);
-        err << QString::fromLocal8Bit(r.out) << QString::fromLocal8Bit(r.err);
-        return r.ok() ? 0 : 2;
+        const dm::ComposeResult r = parser.isSet(projUpOpt) ? dm::ProjectControl::up(cwd)
+                                                            : dm::ProjectControl::down(cwd);
+        err << r.output;
+        return r.ok ? 0 : 2;
     }
 
     // ---- migrate: unbundle + plan/apply restore + health, one step -----
