@@ -3,6 +3,7 @@
 #include "fs_ops.h"
 #include "json_io.h"
 #include "path_util.h"
+#include "snapshot/snapshot_index.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -80,9 +81,10 @@ RestoreResult RestoreExecutor::run(const QString& snapshotDir,
     };
 
     // ---- read manifest ------------------------------------------------------
-    const QJsonObject m = json::read(QDir(snapshotDir).filePath("manifest.json"));
+    QString manifestErr;
+    const QJsonObject m = SnapshotIndex::readManifest(snapshotDir, &manifestErr);
     if (m.isEmpty()) {
-        res.errors << "manifest.json missing or unreadable";
+        res.errors << manifestErr;
         res.state = RestoreState::Failed;
         return res;
     }

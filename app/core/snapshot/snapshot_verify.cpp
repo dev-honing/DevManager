@@ -1,7 +1,7 @@
 #include "snapshot/snapshot_verify.h"
 
 #include "fs_ops.h"
-#include "json_io.h"
+#include "snapshot/snapshot_index.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -15,11 +15,9 @@ VerifyResult SnapshotVerify::check(const QString& snapshotDir)
     VerifyResult res;
     res.snapshotDir = QDir::toNativeSeparators(snapshotDir);
 
-    const QJsonObject m = json::read(QDir(snapshotDir).filePath("manifest.json"));
-    if (m.isEmpty()) {
-        res.error = "manifest.json missing or unreadable";
+    const QJsonObject m = SnapshotIndex::readManifest(snapshotDir, &res.error);
+    if (m.isEmpty())
         return res;
-    }
 
     for (const QJsonValue& v : m.value("components").toArray()) {
         const QJsonObject c = v.toObject();

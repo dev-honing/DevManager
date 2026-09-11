@@ -29,6 +29,15 @@
 #include <QDir>
 #include <QTextStream>
 
+// shared by --restore and --migrate's dry-run output
+static void printRestoreTargets(QTextStream& out, const QList<dm::RestoreTarget>& targets,
+                                const QString& indent)
+{
+    for (const auto& t : targets)
+        out << indent << (t.included ? "[x] " : "[ ] ") << t.name << "  -> " << t.destPath
+            << (t.existsNow ? "  (move aside)" : "") << "\n";
+}
+
 int main(int argc, char** argv)
 {
     QCoreApplication app(argc, argv);
@@ -205,9 +214,7 @@ int main(int argc, char** argv)
         err << "unbundled -> " << m.snapshotDir << "\n";
         if (!m.applied) {
             err << "restore plan: " << m.preview.targets.size() << " targets\n";
-            for (const auto& t : m.preview.targets)
-                err << "  " << (t.included ? "[x] " : "[ ] ") << t.name << "  -> "
-                    << t.destPath << "\n";
+            printRestoreTargets(err, m.preview.targets, "  ");
             err << "(dry run - pass --apply to actually restore)\n";
         } else {
             err << (m.restore.ok ? "restore OK" : "restore FAILED")
@@ -351,9 +358,7 @@ int main(int argc, char** argv)
                 << "  remap: " << pv.sourceUserProfile << " -> "
                 << pv.currentUserProfile << "\n"
                 << "  targets: " << pv.targets.size() << "\n";
-            for (const auto& t : pv.targets)
-                err << "    " << (t.included ? "[x] " : "[ ] ") << t.name << "  -> "
-                    << t.destPath << (t.existsNow ? "  (move aside)" : "") << "\n";
+            printRestoreTargets(err, pv.targets, "    ");
             for (const QString& w : pv.linkWarnings)
                 err << "  link warn: " << w << "\n";
             for (const QString& b : pv.serviceBlockers)

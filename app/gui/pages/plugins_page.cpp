@@ -2,6 +2,7 @@
 
 #include "gui/theme.h"
 #include "gui/widgets/icons.h"
+#include "gui/widgets/table_factory.h"
 #include "gui/widgets/tag_badge.h"
 
 #include <QHeaderView>
@@ -49,16 +50,7 @@ PluginsPage::PluginsPage(QWidget* parent) : QWidget(parent)
     m_stack->addWidget(empty);
 
     // 1: table
-    m_table = new QTableWidget;
-    m_table->setColumnCount(4);
-    m_table->setHorizontalHeaderLabels({"Name", "Host", "Type", "Path"});
-    m_table->verticalHeader()->setVisible(false);
-    m_table->setShowGrid(false);
-    m_table->setAlternatingRowColors(true);
-    m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_table->setSelectionMode(QAbstractItemView::NoSelection);
-    m_table->setFocusPolicy(Qt::NoFocus);
-    m_table->verticalHeader()->setDefaultSectionSize(Metric::RowHeight);
+    m_table = makeListTable({"Name", "Host", "Type", "Path"});
     auto* hh = m_table->horizontalHeader();
     hh->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     hh->setSectionResizeMode(1, QHeaderView::ResizeToContents);

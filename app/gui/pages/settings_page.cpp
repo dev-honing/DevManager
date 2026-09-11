@@ -2,6 +2,7 @@
 
 #include "gui/theme.h"
 #include "gui/widgets/status_badge.h"
+#include "gui/widgets/table_factory.h"
 
 #include <QtConcurrent>
 
@@ -40,23 +41,6 @@ QLabel* sectionSub(const QString& text)
     auto* l = new QLabel(text);
     l->setStyleSheet(QString("color:%1;").arg(Color::Muted));
     return l;
-}
-
-QTableWidget* makeTable(const QStringList& headers)
-{
-    auto* t = new QTableWidget;
-    t->setTextElideMode(Qt::ElideMiddle);
-    t->setColumnCount(headers.size());
-    t->setHorizontalHeaderLabels(headers);
-    t->verticalHeader()->setVisible(false);
-    t->setShowGrid(false);
-    t->setAlternatingRowColors(true);
-    t->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    t->setSelectionMode(QAbstractItemView::NoSelection);
-    t->setFocusPolicy(Qt::NoFocus);
-    t->verticalHeader()->setDefaultSectionSize(Metric::RowHeight);
-    t->horizontalHeader()->setStretchLastSection(true);
-    return t;
 }
 
 StatusBadge::Level badgeLevel(const QString& status)
@@ -113,7 +97,7 @@ SettingsPage::SettingsPage(QWidget* parent) : QWidget(parent)
     healthBar->addWidget(m_healthSummary);
     lay->addLayout(healthBar);
 
-    m_healthTable = makeTable({"Group", "Name", "Status", "Detail"});
+    m_healthTable = makeListTable({"Group", "Name", "Status", "Detail"});
     m_healthTable->setColumnWidth(0, 100);
     m_healthTable->setColumnWidth(1, 140);
     m_healthTable->setColumnWidth(2, 100);
@@ -179,7 +163,7 @@ SettingsPage::SettingsPage(QWidget* parent) : QWidget(parent)
     m_pruneProgress->hide();
     lay->addWidget(m_pruneProgress);
 
-    m_pruneTable = makeTable({"Stamp", "Action"});
+    m_pruneTable = makeListTable({"Stamp", "Action"});
     lay->addWidget(m_pruneTable, 1);
 
     connect(&m_healthWatcher, &QFutureWatcher<HealthReport>::finished, this,

@@ -100,6 +100,36 @@ generated, move the covered entries into that revision and clear them here.
   GUI (Projects page), §11 컨테이너 트랙 (note the GUI path alongside the CLI),
   §13 tests (14 suites, add `tst_project_control`).
 
+### 5. Ponytail-audit cleanup: dedup GUI table setup, manifest reads, restore-plan printing
+- Commit: `<fill on merge>` (branch `chore/ponytail-audit-cleanup`)
+- Requested review, not a new feature: whole-codebase over-engineering/
+  duplication audit, then applied the findings.
+- `gui/widgets/table_factory.{h,cpp}` (`makeListTable`) replaces identical
+  ~8-line `QTableWidget` setup blocks that had drifted apart (`RowHeight` vs
+  `RowHeight+2`/`+4`, `NoSelection` vs `SingleSelection`) across 7 pages'
+  read-only tables (packages/plugins/env_vars/environment/restore/snapshot/
+  settings ×2). Skills page keeps its own setup deliberately -- it's the one
+  table that allows row selection, a real difference, not drift.
+- Also deleted three no-op `setSelectionBehavior(SelectRows)` calls paired
+  with `NoSelection` (env_vars/environment/packages pages) -- had no effect.
+- `SnapshotIndex::readManifest(dir, &error)` replaces "read manifest.json,
+  empty-check, bespoke error string" duplicated in 6 places (restore_executor,
+  restore_preview, snapshot_verify, snapshot_diff ×2, snapshot_index's own
+  `list()`) and centralizes the "manifest.json" filename literal that was
+  repeated ~10×.
+- `cli/main.cpp`: `printRestoreTargets()` replaces the `--restore`/`--migrate`
+  dry-run target-listing loop that was duplicated between the two commands
+  (`--migrate` dry output gained the "(move aside)" annotation `--restore`
+  already had, as a side effect of sharing the code).
+- Verified: full rebuild + 14/14 suites; CLI smoke (`--verify`/`--diff`/
+  `--restore`/`--migrate`, all producing identical output to before); GUI
+  screenshot regression pass across all 7 affected pages + Restore's dry
+  check (headroom-config/deploy shown correctly) -- no visual or behavioral
+  change anywhere.
+- **Docx sections to touch:** none load-bearing (internal refactor); §2.1
+  module table could add `gui/widgets/table_factory` as a footnote if the
+  GUI widget list is ever itemized that deeply.
+
 ---
 
 ## How to use this file

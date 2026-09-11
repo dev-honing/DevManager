@@ -58,6 +58,7 @@ add_executable(devmanager-gui WIN32
     gui/widgets/machine_card.cpp
     gui/widgets/right_panel.cpp
     gui/widgets/tag_badge.cpp
+    gui/widgets/table_factory.cpp
     gui/pages/environment_page.cpp
     gui/pages/skills_page.cpp
     gui/pages/plugins_page.cpp

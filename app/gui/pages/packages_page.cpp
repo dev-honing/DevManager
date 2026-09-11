@@ -2,6 +2,7 @@
 
 #include "gui/theme.h"
 #include "gui/widgets/segmented_control.h"
+#include "gui/widgets/table_factory.h"
 #include "gui/widgets/tag_badge.h"
 
 #include <QHBoxLayout>
@@ -45,17 +46,7 @@ PackagesPage::PackagesPage(QWidget* parent) : QWidget(parent)
     bar->addWidget(m_search);
     lay->addLayout(bar);
 
-    m_table = new QTableWidget;
-    m_table->setColumnCount(4);
-    m_table->setHorizontalHeaderLabels({"Name", "Manager", "Version", "Restore policy"});
-    m_table->verticalHeader()->setVisible(false);
-    m_table->setShowGrid(false);
-    m_table->setAlternatingRowColors(true);
-    m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_table->setSelectionMode(QAbstractItemView::NoSelection);
-    m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_table->setFocusPolicy(Qt::NoFocus);
-    m_table->verticalHeader()->setDefaultSectionSize(Metric::RowHeight);
+    m_table = makeListTable({"Name", "Manager", "Version", "Restore policy"});
     auto* hh = m_table->horizontalHeader();
     hh->setSectionResizeMode(0, QHeaderView::Stretch);
     hh->setSectionResizeMode(1, QHeaderView::Fixed);

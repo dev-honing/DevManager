@@ -1,6 +1,7 @@
 #include "gui/pages/snapshot_page.h"
 
 #include "gui/theme.h"
+#include "gui/widgets/table_factory.h"
 #include "gui/widgets/tag_badge.h"
 
 #include <QtConcurrent>
@@ -99,17 +100,7 @@ SnapshotPage::SnapshotPage(QWidget* parent) : QWidget(parent)
     m_blockers->hide();
     lay->addWidget(m_blockers);
 
-    m_table = new QTableWidget;
-    m_table->setTextElideMode(Qt::ElideMiddle);
-    m_table->setColumnCount(5);
-    m_table->setHorizontalHeaderLabels({"Root", "Entry", "Policy", "Size", "Files"});
-    m_table->verticalHeader()->setVisible(false);
-    m_table->setShowGrid(false);
-    m_table->setAlternatingRowColors(true);
-    m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_table->setSelectionMode(QAbstractItemView::NoSelection);
-    m_table->setFocusPolicy(Qt::NoFocus);
-    m_table->verticalHeader()->setDefaultSectionSize(Metric::RowHeight);
+    m_table = makeListTable({"Root", "Entry", "Policy", "Size", "Files"});
     auto* hh = m_table->horizontalHeader();
     hh->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     hh->setSectionResizeMode(1, QHeaderView::Stretch);
