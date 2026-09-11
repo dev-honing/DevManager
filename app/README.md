@@ -64,11 +64,17 @@ install still succeeds but warns; add `C:/Qt/6.10.3/msvc2022_64/bin`.)
 
 ```
 devmanager-scan --bundle backups\<stamp> --bundle-out env.tar.gz
-:: copy env.tar.gz to the new PC, then
+:: copy env.tar.gz to the new PC, then either the one-step path:
+devmanager-scan --migrate env.tar.gz --migrate-out .\incoming            :: dry run
+devmanager-scan --migrate env.tar.gz --migrate-out .\incoming --apply    :: apply
+:: ...or the manual steps it wraps:
 devmanager-scan --unbundle env.tar.gz --unbundle-out .\incoming
 devmanager-scan --restore .\incoming\<stamp>            :: dry run
 devmanager-scan --restore .\incoming\<stamp> --apply    :: apply
 ```
+
+`--migrate` unbundles, computes the restore plan (or applies it with
+`--apply`), then runs `--health` so you see readiness in one command.
 
 The bundle is a plain gzip tar of the snapshot dir (system `tar`). Snapshots
 never contain credential files, so the bundle carries no secrets — re-login
