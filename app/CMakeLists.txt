@@ -17,6 +17,7 @@ add_library(devmanager_core STATIC
     core/fs_ops.cpp
     core/health_check.cpp
     core/bootstrap.cpp
+    core/migrate.cpp
     core/config/scan_config.cpp
     core/scan/skill_scanner.cpp
     core/scan/env_scanner.cpp
@@ -121,6 +122,10 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_project_env tests/tst_project_env.cpp)
     target_link_libraries(tst_project_env PRIVATE devmanager_core Qt6::Test)
     add_test(NAME project_env COMMAND tst_project_env)
+
+    add_executable(tst_migrate tests/tst_migrate.cpp)
+    target_link_libraries(tst_migrate PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME migrate COMMAND tst_migrate)
 endif()
 
 # ---- install: a self-contained folder (see deploy.bat) ----

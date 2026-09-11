@@ -8,6 +8,7 @@
 #include "bootstrap.h"
 #include "health_check.h"
 #include "json_io.h"
+#include "migrate.h"
 #include "process_runner.h"
 #include "project/project_env.h"
 #include "scan/env_scanner.h"
@@ -78,6 +79,11 @@ int main(int argc, char** argv)
                                    "type", "cpp");
     QCommandLineOption projUpOpt("project-up", "docker compose up -d for the generated project.");
     QCommandLineOption projDownOpt("project-down", "docker compose down for it.");
+    QCommandLineOption migrateOpt("migrate", "New-PC path: unbundle + plan restore + "
+                                             "health, in one step (add --apply to "
+                                             "actually restore).", "bundle-file");
+    QCommandLineOption migrateOutOpt("migrate-out", "Where to extract (default: cwd).",
+                                     "dir");
     QCommandLineOption pruneOpt("prune", "Show which snapshots retention would drop "
                                          "(add --apply to delete them).");
     QCommandLineOption keepLastOpt("keep-last", "prune: keep the N newest snapshots.",
@@ -105,6 +111,8 @@ int main(int argc, char** argv)
     parser.addOption(projTypeOpt);
     parser.addOption(projUpOpt);
     parser.addOption(projDownOpt);
+    parser.addOption(migrateOpt);
+    parser.addOption(migrateOutOpt);
     parser.addOption(pruneOpt);
     parser.addOption(keepLastOpt);
     parser.addOption(keepDaysOpt);
@@ -187,6 +195,37 @@ int main(int argc, char** argv)
         const dm::ProcessResult r = dm::ProcessRunner::run("docker", args, 120000);
         err << QString::fromLocal8Bit(r.out) << QString::fromLocal8Bit(r.err);
         return r.ok() ? 0 : 2;
+    }
+
+    // ---- migrate: unbundle + plan/apply restore + health, one step -----
+    if (parser.isSet(migrateOpt)) {
+        const QString outDir = parser.isSet(migrateOutOpt) ? parser.value(migrateOutOpt)
+                                                            : QDir::currentPath();
+        const dm::MigrateResult m = dm::Migrate::run(
+            parser.value(migrateOpt), outDir, parser.isSet(applyOpt));
+        if (!m.error.isEmpty() && !m.applied) {
+            err << "error: " << m.error << "\n";
+            return 1;
+        }
+        err << "unbundled -> " << m.snapshotDir << "\n";
+        if (!m.applied) {
+            err << "restore plan: " << m.preview.targets.size() << " targets\n";
+            for (const auto& t : m.preview.targets)
+                err << "  " << (t.included ? "[x] " : "[ ] ") << t.name << "  -> "
+                    << t.destPath << "\n";
+            err << "(dry run - pass --apply to actually restore)\n";
+        } else {
+            err << (m.restore.ok ? "restore OK" : "restore FAILED")
+                << " state=" << dm::restoreStateName(m.restore.state)
+                << " restored=" << m.restore.restored << "\n";
+            for (const QString& e : m.restore.errors) err << "  err: " << e << "\n";
+        }
+        err << "\n--- health ---\n";
+        for (const auto& it : m.health.items)
+            err << "  " << it.status << "  [" << it.group << "] " << it.name << "\n";
+        err << (m.health.ok ? "READY " : "NOT READY ") << m.health.okCount << " ok, "
+            << m.health.warnCount << " warn, " << m.health.failCount << " fail\n";
+        return m.ok ? 0 : 2;
     }
 
     // ---- bootstrap: print install commands for missing tools ----------
