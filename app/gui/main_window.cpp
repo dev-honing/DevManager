@@ -4,9 +4,9 @@
 #include "gui/pages/env_vars_page.h"
 #include "gui/pages/environment_page.h"
 #include "gui/pages/packages_page.h"
-#include "gui/pages/placeholder_page.h"
 #include "gui/pages/plugins_page.h"
 #include "gui/pages/restore_page.h"
+#include "gui/pages/settings_page.h"
 #include "gui/pages/skills_page.h"
 #include "gui/pages/snapshot_page.h"
 #include "gui/theme.h"
@@ -101,8 +101,11 @@ void MainWindow::buildUi()
     });
     m_stack->addWidget(m_snapshotPage);   // 5
     m_stack->addWidget(m_restorePage);    // 6
-    m_stack->addWidget(new PlaceholderPage(
-        "settings", "Settings", "Nothing to configure yet."));                       // 7
+    m_settingsPage = new SettingsPage;
+    connect(m_settingsPage, &SettingsPage::snapshotsPruned, this, [this] {
+        m_rightPanel->setSnapshots(SnapshotIndex::list(m_backupsDir));
+    });
+    m_stack->addWidget(m_settingsPage);   // 7
 
     m_rightPanel = new RightPanel;
     connect(m_rightPanel, &RightPanel::scanRequested,
@@ -205,6 +208,7 @@ void MainWindow::refreshMigrationPages()
     m_snapshotPage->setServices(m_lastServices);
     m_snapshotPage->setBackupsDir(m_backupsDir);
     m_restorePage->setContext(m_backupsDir, m_lastServices);
+    m_settingsPage->setBackupsDir(m_backupsDir);
 }
 
 void MainWindow::onNavSelected(const QString& id)

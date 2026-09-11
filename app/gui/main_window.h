@@ -19,6 +19,7 @@ class PackagesPage;
 class EnvVarsPage;
 class SnapshotPage;
 class RestorePage;
+class SettingsPage;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -59,6 +60,7 @@ private:
     EnvVarsPage* m_envVarsPage = nullptr;
     SnapshotPage* m_snapshotPage = nullptr;
     RestorePage* m_restorePage = nullptr;
+    SettingsPage* m_settingsPage = nullptr;
 
     QString m_backupsDir;
     QString m_configSource;
