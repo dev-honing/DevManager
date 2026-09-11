@@ -101,7 +101,7 @@ generated, move the covered entries into that revision and clear them here.
   §13 tests (14 suites, add `tst_project_control`).
 
 ### 5. Ponytail-audit cleanup: dedup GUI table setup, manifest reads, restore-plan printing
-- Commit: `<fill on merge>` (branch `chore/ponytail-audit-cleanup`)
+- Commit: `e3a8026`, merge `fe7d123`
 - Requested review, not a new feature: whole-codebase over-engineering/
   duplication audit, then applied the findings.
 - `gui/widgets/table_factory.{h,cpp}` (`makeListTable`) replaces identical
@@ -129,6 +129,43 @@ generated, move the covered entries into that revision and clear them here.
 - **Docx sections to touch:** none load-bearing (internal refactor); §2.1
   module table could add `gui/widgets/table_factory` as a footnote if the
   GUI widget list is ever itemized that deeply.
+
+### 6. Service detail: health + env-wiring, separate from Running/Stopped
+- Commit: `8fe1cbe`, merge `<fill after this merge>`
+- Prompted by a design question: "Running" (TCP port open) and "actually in
+  use right now" are different states, and the dashboard only showed the
+  first. Scoped to **status detail only** — no new "connect" action, since
+  neither Headroom nor OmniRoute has anything a user manually connects to.
+- `ScanConfig`/`ServiceSpec` gains an optional `envIndicatorVar` (config,
+  not hardcoded) — the env var whose value should name the service's own
+  port when the current environment is actually wired to it. Set for
+  headroom (`ANTHROPIC_BASE_URL`) and omniroute (`ANTHROPIC_TARGET_API_URL`)
+  in both `defaults()` and `config/scan.json`.
+- New `app/core/service/service_detail.{h,cpp}` (`ServiceDetailCheck::run`):
+  for each configured service, reuses `ServiceLifecycle::run(spec, Status)`
+  (already-existing infra) and regex-parses a generic `Healthy:\s*(yes|no)`
+  line if the service's status output has one (no per-service hardcoding);
+  separately checks whether `envIndicatorVar`'s scanned value contains
+  `:<port>`. On-demand only (shells out per service) -- not part of the
+  cheap `ServiceProbe` liveness check used on every scan.
+- CLI: `devmanager-scan --service-detail`.
+- GUI: new "Service Details" section on the Settings page (`ServiceDetail`
+  members/methods on `SettingsPage`, fed via `MainWindow::onScanFinished`
+  caching `inv.env` and `refreshMigrationPages()` calling
+  `setServiceContext`).
+- New test `tst_service_detail`. 15 suites.
+- Verified against real Headroom/OmniRoute (both CLI and the real running
+  GUI): **Headroom is Running + unhealthy + NOT wired to
+  `ANTHROPIC_BASE_URL`** (which is actually `https://api.anthropic.com` on
+  this box) -- concretely confirming the running-but-unused case the
+  feature exists to surface. OmniRoute: Stopped, no health signal, but
+  `ANTHROPIC_TARGET_API_URL` does point at its port (Headroom's own forward
+  target, configured but currently moot since nothing reaches Headroom).
+- **Docx sections to touch:** §3 config (`envIndicatorVar`), §2.1 module
+  table (`service_detail`), §2.3 CLI (`--service-detail`), §2.2/§9 GUI
+  (Settings "Service Details" section), §13 tests (15 suites), possibly a
+  new §6.x explaining the Running/Healthy/Wired distinction (this session's
+  design discussion is worth preserving).
 
 ---
 

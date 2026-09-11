@@ -67,6 +67,7 @@ private:
     QString m_backupsDir;
     QString m_configSource;
     QList<dm::ServiceState> m_lastServices;
+    QMap<QString, QString> m_lastEnv;
     void refreshMigrationPages();
 };
 

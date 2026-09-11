@@ -4,6 +4,7 @@
 
 #include "core/bootstrap.h"
 #include "core/health_check.h"
+#include "core/service/service_detail.h"
 #include "core/snapshot/snapshot_retention.h"
 
 class QComboBox;
@@ -23,6 +24,7 @@ class SettingsPage : public QWidget {
 public:
     explicit SettingsPage(QWidget* parent = nullptr);
     void setBackupsDir(const QString& dir);
+    void setServiceContext(const QList<ServiceState>& services, const QMap<QString, QString>& env);
 
 signals:
     void snapshotsPruned();   // -> app should refresh Recent Snapshots
@@ -39,14 +41,21 @@ private:
     void renderPrune(const PrunePlan& p);
     void confirmAndApplyPrune();
     void onPruned(const PruneResult& r);
+    // service detail (health + env wiring, separate from the plain Running/Stopped
+    // badges elsewhere -- see setServiceContext)
+    void checkServiceDetails();
+    void renderServiceDetails(const QList<ServiceDetail>& details);
 
     QString m_backupsDir;
     PrunePlan m_lastPlan;
+    QList<ServiceState> m_services;
+    QMap<QString, QString> m_env;
 
     QFutureWatcher<HealthReport> m_healthWatcher;
     QFutureWatcher<BootstrapPlan> m_bootstrapWatcher;
     QFutureWatcher<PrunePlan> m_pruneWatcher;
     QFutureWatcher<PruneResult> m_pruneApplyWatcher;
+    QFutureWatcher<QList<ServiceDetail>> m_serviceDetailWatcher;
 
     QComboBox* m_profileCombo = nullptr;
     QPushButton* m_healthBtn = nullptr;
@@ -64,6 +73,10 @@ private:
     QLabel* m_pruneSummary = nullptr;
     QTableWidget* m_pruneTable = nullptr;
     QProgressBar* m_pruneProgress = nullptr;
+
+    QPushButton* m_serviceDetailBtn = nullptr;
+    QLabel* m_serviceDetailHint = nullptr;
+    QTableWidget* m_serviceDetailTable = nullptr;
 };
 
 } // namespace dm
