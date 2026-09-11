@@ -71,6 +71,11 @@ int main(int argc, char** argv)
                         b->click();
             }
             if (!clickText.isEmpty()) {
+                // the click may pop a QMessageBox::question (e.g. Up/Down/Prune) --
+                // poll-accept it, same trick as --shot-create below.
+                auto* poll = new QTimer(&w);
+                poll->start(300);
+                QObject::connect(poll, &QTimer::timeout, acceptModals);
                 for (auto* b : w.findChildren<QPushButton*>())
                     if (b->isVisible() && b->isEnabled() && b->text().contains(clickText))
                         b->click();
@@ -88,7 +93,7 @@ int main(int argc, char** argv)
                 poll->start(300);
                 QObject::connect(poll, &QTimer::timeout, acceptModals);
             }
-            const int wait = create ? 30000 : (dry || !clickText.isEmpty()) ? 12000 : 400;
+            const int wait = create ? 30000 : !clickText.isEmpty() ? 20000 : dry ? 12000 : 400;
             QTimer::singleShot(wait, &w, [&w, path] {
                 w.grab().save(path);
                 qApp->quit();

@@ -88,12 +88,15 @@ generated, move the covered entries into that revision and clear them here.
   `--shot-click`, so a full fill+click flow is screenshot-testable headlessly.
 - New test `tst_project_control` (writeFiles creates both files / rejects a
   host-profile spec). 14 suites total.
-- Verified against the real running app: Projects page renders; filling
-  folder+name and clicking "Generate Files" actually wrote a correct
-  `docker-compose.yml` + `devcontainer.json` to disk and the Up/Down buttons
-  correctly enabled afterward. `Up`/`Down` themselves reuse the exact
-  `ProjectControl` calls already proven against real Docker via the CLI
-  (P11.2/11.3 smoke + this session's CLI re-verification after the refactor).
+- Verified against the real running app, including `Up`/`Down` themselves (not
+  just proven-by-reuse): generalized `gui/main.cpp`'s modal-accept poll to run
+  for any `--shot-click`, not just `--shot-create`, so a real
+  `QMessageBox::question` confirm gets auto-accepted headlessly. Ran three
+  screenshot passes against a real project folder: Generate Files (wrote
+  `docker-compose.yml`/`devcontainer.json`), Up (real `docker compose up -d` --
+  network + 4 volumes + container created and started), Down (container +
+  network removed, volumes kept). Commit `<fill on merge>` (branch
+  `chore/verify-projects-gui-up-down`).
 - **Docx sections to touch:** §2.1 module table (add `project_control`), §2.2
   GUI (Projects page), §11 컨테이너 트랙 (note the GUI path alongside the CLI),
   §13 tests (14 suites, add `tst_project_control`).
