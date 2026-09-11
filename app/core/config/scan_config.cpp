@@ -41,10 +41,10 @@ ScanConfig ScanConfig::defaults()
           {"install", "start", "--profile", "init-user"},
           {"install", "restart", "--profile", "init-user"},
           false},
-         true},
+         true, "ANTHROPIC_BASE_URL"},
         {"omniroute", "OmniRoute", 20128, {}, false,
          {"omniroute", {"status"}, {"stop"}, {"serve"}, {"restart"}, true},
-         true},
+         true, "ANTHROPIC_TARGET_API_URL"},
         {"ollama", "Ollama", 11434, {}, false, {}},
         {"docker", "Docker", 0, {"docker", "version", "--format", "{{.Server.Version}}"}, false, {}},
         {"wsl", "WSL", 0, {}, true, {}},
@@ -206,6 +206,7 @@ ScanConfig ScanConfig::load()
                 s.lifecycle.startDetached = lc.value("startDetached").toBool(true);
             }
             s.snapshotBlocker = o.value("snapshotBlocker").toBool(false);
+            s.envIndicatorVar = o.value("envIndicatorVar").toString();
             if (!s.id.isEmpty())
                 c.services << s;
         }

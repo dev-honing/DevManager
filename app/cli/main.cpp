@@ -12,6 +12,7 @@
 #include "project/project_control.h"
 #include "project/project_env.h"
 #include "scan/env_scanner.h"
+#include "service/service_detail.h"
 #include "service/service_lifecycle.h"
 #include "service/service_probe.h"
 #include "snapshot/restore_executor.h"
@@ -73,6 +74,9 @@ int main(int argc, char** argv)
                                   "id");
     QCommandLineOption serviceOpOpt("service-op", "status | stop | start | restart.",
                                     "op", "status");
+    QCommandLineOption serviceDetailOpt("service-detail", "Health + \"is the current "
+                                                          "env actually wired to it\" "
+                                                          "for every configured service.");
     QCommandLineOption projInitOpt("project-init", "Generate .devmanager/docker-compose.yml "
                                                    "+ .devcontainer/ for a project.", "name");
     QCommandLineOption projTypeOpt("project-type", "cpp | nextjs | ... (project-types.json).",
@@ -107,6 +111,7 @@ int main(int argc, char** argv)
     parser.addOption(bootstrapOpt);
     parser.addOption(serviceOpt);
     parser.addOption(serviceOpOpt);
+    parser.addOption(serviceDetailOpt);
     parser.addOption(projInitOpt);
     parser.addOption(projTypeOpt);
     parser.addOption(projUpOpt);
@@ -153,6 +158,21 @@ int main(int argc, char** argv)
         if (!r.error.isEmpty())
             err << "  err: " << r.error << "\n";
         return r.ok ? 0 : 2;
+    }
+
+    // ---- service detail (health + env wiring) --------------------------
+    if (parser.isSet(serviceDetailOpt)) {
+        const dm::EnvironmentInventory inv = dm::EnvironmentScanner::scan();
+        const auto details =
+            dm::ServiceDetailCheck::run(dm::ServiceProbe::probeAll(), inv.env);
+        for (const auto& d : details)
+            err << "  " << (d.running ? "running" : "stopped") << "  "
+                << (d.health.isEmpty() ? "-" : d.health) << "  "
+                << (d.envVar.isEmpty() ? "(no env indicator)"
+                                      : (d.envWired ? "wired via " + d.envVar
+                                                    : "NOT wired (" + d.envVar + ")"))
+                << "  [" << d.name << "]\n";
+        return 0;
     }
 
     // ---- project container setup (P11.2/11.3) ------------------------

@@ -41,6 +41,8 @@ struct ServiceSpec {
     bool wslRunning = false;     // true => `wsl -l -q --running` non-empty => running
     ServiceLifecycleSpec lifecycle;
     bool snapshotBlocker = false; // holds files under a backup root open => stop before a snapshot
+    QString envIndicatorVar;     // env var (from scanEnv) whose value should name this service's
+                                 // own port when the current environment is actually wired to it
 };
 
 struct PackageManagerSpec {

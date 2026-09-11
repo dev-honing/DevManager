@@ -215,6 +215,7 @@ void MainWindow::refreshMigrationPages()
     m_snapshotPage->setBackupsDir(m_backupsDir);
     m_restorePage->setContext(m_backupsDir, m_lastServices);
     m_settingsPage->setBackupsDir(m_backupsDir);
+    m_settingsPage->setServiceContext(m_lastServices, m_lastEnv);
 }
 
 void MainWindow::onNavSelected(const QString& id)
@@ -240,6 +241,7 @@ void MainWindow::onScanFinished(const EnvironmentInventory& inv)
     m_pluginsPage->setInventory(inv);
     m_packagesPage->setInventory(inv);
     m_envVarsPage->setInventory(inv);
+    m_lastEnv = inv.env;
 
     int linked = 0;
     for (const auto& s : inv.skills)

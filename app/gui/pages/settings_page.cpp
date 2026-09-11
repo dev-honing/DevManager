@@ -120,6 +120,34 @@ SettingsPage::SettingsPage(QWidget* parent) : QWidget(parent)
     m_healthTable->setMaximumHeight(220);
     lay->addWidget(m_healthTable);
 
+    // ---------------------------------------------------- Service details
+    lay->addWidget(sectionTitle("Service Details"));
+    lay->addWidget(sectionSub("\"Running\" just means the process is alive -- not that it's "
+                              "healthy, or that anything is actually routed through it."));
+    auto* svcBar = new QHBoxLayout;
+    m_serviceDetailBtn = new QPushButton("  Check Service Details");
+    m_serviceDetailBtn->setCursor(Qt::PointingHandCursor);
+    connect(m_serviceDetailBtn, &QPushButton::clicked, this, &SettingsPage::checkServiceDetails);
+    m_serviceDetailHint = new QLabel;
+    m_serviceDetailHint->setStyleSheet(QString("color:%1;").arg(Color::Muted));
+    svcBar->addWidget(m_serviceDetailBtn);
+    svcBar->addStretch(1);
+    svcBar->addWidget(m_serviceDetailHint);
+    lay->addLayout(svcBar);
+
+    m_serviceDetailTable = new QTableWidget;
+    m_serviceDetailTable->setColumnCount(4);
+    m_serviceDetailTable->setHorizontalHeaderLabels({"Service", "Running", "Health", "Env wired"});
+    m_serviceDetailTable->verticalHeader()->setVisible(false);
+    m_serviceDetailTable->setShowGrid(false);
+    m_serviceDetailTable->setAlternatingRowColors(true);
+    m_serviceDetailTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_serviceDetailTable->setSelectionMode(QAbstractItemView::NoSelection);
+    m_serviceDetailTable->setFocusPolicy(Qt::NoFocus);
+    m_serviceDetailTable->verticalHeader()->setDefaultSectionSize(Metric::RowHeight);
+    m_serviceDetailTable->horizontalHeader()->setStretchLastSection(true);
+    lay->addWidget(m_serviceDetailTable);
+
     // ---------------------------------------------------------- Bootstrap
     lay->addWidget(sectionTitle("Bootstrap — install missing tools"));
     auto* bsBar = new QHBoxLayout;
@@ -190,9 +218,18 @@ SettingsPage::SettingsPage(QWidget* parent) : QWidget(parent)
             [this] { renderPrune(m_pruneWatcher.result()); });
     connect(&m_pruneApplyWatcher, &QFutureWatcher<PruneResult>::finished, this,
             [this] { onPruned(m_pruneApplyWatcher.result()); });
+    connect(&m_serviceDetailWatcher, &QFutureWatcher<QList<ServiceDetail>>::finished, this,
+            [this] { renderServiceDetails(m_serviceDetailWatcher.result()); });
 }
 
 void SettingsPage::setBackupsDir(const QString& dir) { m_backupsDir = dir; }
+
+void SettingsPage::setServiceContext(const QList<ServiceState>& services,
+                                     const QMap<QString, QString>& env)
+{
+    m_services = services;
+    m_env = env;
+}
 
 // -------------------------------------------------------------- Health
 void SettingsPage::runHealth()
@@ -341,6 +378,56 @@ void SettingsPage::onPruned(const PruneResult& r)
         QMessageBox::warning(this, "Prune failed", r.errors.join("\n"));
     emit snapshotsPruned();
     previewPrune();   // refresh the table against the now-smaller backups/
+}
+
+// -------------------------------------------------------------- Service detail
+void SettingsPage::checkServiceDetails()
+{
+    if (m_serviceDetailWatcher.isRunning())
+        return;
+    m_serviceDetailBtn->setEnabled(false);
+    m_serviceDetailBtn->setText("  Checking...");
+    const auto services = m_services;
+    const auto env = m_env;
+    m_serviceDetailWatcher.setFuture(
+        QtConcurrent::run([services, env] { return ServiceDetailCheck::run(services, env); }));
+}
+
+void SettingsPage::renderServiceDetails(const QList<ServiceDetail>& details)
+{
+    m_serviceDetailBtn->setEnabled(true);
+    m_serviceDetailBtn->setText("  Check Service Details");
+    m_serviceDetailHint->setText(QString("checked %1 service(s)").arg(details.size()));
+
+    m_serviceDetailTable->clearContents();
+    m_serviceDetailTable->setRowCount(details.size());
+    for (int i = 0; i < details.size(); ++i) {
+        const ServiceDetail& d = details.at(i);
+        m_serviceDetailTable->setItem(i, 0, new QTableWidgetItem(d.name));
+        m_serviceDetailTable->setCellWidget(i, 1, badgeCell(d.running ? "ok" : "warn"));
+
+        const QString health = d.health.isEmpty() ? "n/a" : d.health;
+        auto* h = new QTableWidgetItem(health);
+        h->setForeground(QColor(d.health == "unhealthy" ? Color::Danger
+                                : d.health == "healthy" ? Color::Success
+                                                        : Color::Muted));
+        m_serviceDetailTable->setItem(i, 2, h);
+
+        QString wired = "n/a";
+        if (!d.envVar.isEmpty())
+            wired = d.envWired ? "wired (" + d.envVar + ")" : "not wired (" + d.envVar + ")";
+        auto* w = new QTableWidgetItem(wired);
+        w->setForeground(QColor(d.envVar.isEmpty() ? Color::Muted
+                                : d.envWired ? Color::Success
+                                            : Color::Warning));
+        m_serviceDetailTable->setItem(i, 3, w);
+    }
+
+    // size to fit every row (no inner scrollbar), clamped to a sane range
+    const int header = m_serviceDetailTable->horizontalHeader()->height();
+    const int rows = qMax(details.size(), 1);
+    m_serviceDetailTable->setFixedHeight(
+        qBound(120, header + rows * Metric::RowHeight + 6, 280));
 }
 
 } // namespace dm

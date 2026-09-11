@@ -21,6 +21,7 @@
   "services": [
     { "_comment": "stop/start/restart below assume a FOREGROUND headroom deployment. This machine's 'init-user' profile uses persistent-task (Windows Scheduled Task) scheduling, for which `headroom install stop|start|restart` is rejected -- verified 2026-09-11. For a task deployment, point these at `schtasks /end|/run /tn headroom-<profile>-startup` instead. 'status' works for both.",
       "id": "headroom", "name": "Headroom", "port": 8787, "snapshotBlocker": true,
+      "envIndicatorVar": "ANTHROPIC_BASE_URL",
       "lifecycle": { "exe": "headroom",
         "status":  ["install", "status",  "--profile", "init-user"],
         "stop":    ["install", "stop",    "--profile", "init-user"],
@@ -28,6 +29,7 @@
         "restart": ["install", "restart", "--profile", "init-user"],
         "startDetached": false } },
     { "id": "omniroute", "name": "OmniRoute", "port": 20128, "snapshotBlocker": true,
+      "envIndicatorVar": "ANTHROPIC_TARGET_API_URL",
       "lifecycle": { "exe": "omniroute",
         "status": ["status"], "stop": ["stop"], "start": ["serve"], "restart": ["restart"],
         "startDetached": true } },
