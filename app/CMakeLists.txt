@@ -24,6 +24,7 @@ add_library(devmanager_core STATIC
     core/service/service_probe.cpp
     core/service/service_lifecycle.cpp
     core/project/project_env.cpp
+    core/project/project_control.cpp
     core/snapshot/snapshot_index.cpp
     core/snapshot/snapshot_preview.cpp
     core/snapshot/restore_preview.cpp
@@ -65,6 +66,7 @@ add_executable(devmanager-gui WIN32
     gui/pages/snapshot_page.cpp
     gui/pages/restore_page.cpp
     gui/pages/settings_page.cpp
+    gui/pages/projects_page.cpp
 )
 target_include_directories(devmanager-gui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(devmanager-gui PRIVATE
@@ -126,6 +128,10 @@ if(DEVMANAGER_BUILD_TESTS)
     add_executable(tst_migrate tests/tst_migrate.cpp)
     target_link_libraries(tst_migrate PRIVATE devmanager_core Qt6::Test)
     add_test(NAME migrate COMMAND tst_migrate)
+
+    add_executable(tst_project_control tests/tst_project_control.cpp)
+    target_link_libraries(tst_project_control PRIVATE devmanager_core Qt6::Test)
+    add_test(NAME project_control COMMAND tst_project_control)
 endif()
 
 # ---- install: a self-contained folder (see deploy.bat) ----

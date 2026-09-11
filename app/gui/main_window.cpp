@@ -5,6 +5,7 @@
 #include "gui/pages/environment_page.h"
 #include "gui/pages/packages_page.h"
 #include "gui/pages/plugins_page.h"
+#include "gui/pages/projects_page.h"
 #include "gui/pages/restore_page.h"
 #include "gui/pages/settings_page.h"
 #include "gui/pages/skills_page.h"
@@ -61,6 +62,9 @@ void MainWindow::buildUi()
     m_sidebar->addSection("Migration");
     m_sidebar->addItem("snapshots", "snapshots", "Snapshots");
     m_sidebar->addItem("restore", "restore", "Restore");
+    m_sidebar->addSection("Containers");
+    m_sidebar->addItem("projects", "container", "Projects");
+    m_sidebar->addSection("General");
     m_sidebar->addItem("settings", "settings", "Settings");
     m_sidebar->addFooterItem("docs", "docs", "Documentation");
     m_sidebar->addFooterItem("about", "about", "About");
@@ -101,11 +105,13 @@ void MainWindow::buildUi()
     });
     m_stack->addWidget(m_snapshotPage);   // 5
     m_stack->addWidget(m_restorePage);    // 6
+    m_projectsPage = new ProjectsPage;
+    m_stack->addWidget(m_projectsPage);   // 7
     m_settingsPage = new SettingsPage;
     connect(m_settingsPage, &SettingsPage::snapshotsPruned, this, [this] {
         m_rightPanel->setSnapshots(SnapshotIndex::list(m_backupsDir));
     });
-    m_stack->addWidget(m_settingsPage);   // 7
+    m_stack->addWidget(m_settingsPage);   // 8
 
     m_rightPanel = new RightPanel;
     connect(m_rightPanel, &RightPanel::scanRequested,
@@ -215,7 +221,8 @@ void MainWindow::onNavSelected(const QString& id)
 {
     static const QHash<QString, int> map{
         {"environment", 0}, {"skills", 1}, {"plugins", 2}, {"packages", 3},
-        {"envvars", 4}, {"snapshots", 5}, {"restore", 6}, {"settings", 7}};
+        {"envvars", 4}, {"snapshots", 5}, {"restore", 6}, {"projects", 7},
+        {"settings", 8}};
     if (map.contains(id))
         m_stack->setCurrentIndex(map.value(id));
 }

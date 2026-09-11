@@ -132,4 +132,17 @@ QString ProjectEnv::devcontainerJson(const ProjectSpec& s)
     return QString::fromUtf8(QJsonDocument(o).toJson(QJsonDocument::Indented));
 }
 
+QStringList ProjectEnv::availableTypes()
+{
+    const QString file = findProjectTypes();
+    if (file.isEmpty())
+        return {"cpp", "nextjs"};
+    const QJsonObject root = json::read(file);
+    QStringList types;
+    for (const QString& k : root.keys())
+        if (!k.startsWith('_'))   // _comment / _hostProfiles etc.
+            types << k;
+    return types.isEmpty() ? QStringList{"cpp", "nextjs"} : types;
+}
+
 } // namespace dm

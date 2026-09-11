@@ -66,6 +66,38 @@ generated, move the covered entries into that revision and clear them here.
   retention (note GUI access), §11 tests (GUI has no unit suite by convention —
   screenshot-verified like other pages).
 
+### 3. GUI integration of Project containers (new Projects page, P11)
+- Commit: `<fill on merge>` (branch `feat/projects-gui`)
+- New core module `app/core/project/project_control.{h,cpp}` (`ProjectControl`):
+  `writeFiles(spec, projectDir)` (the compose+devcontainer file I/O),
+  `hasCompose(projectDir)`, `up(projectDir)`/`down(projectDir)` (blocking
+  `docker compose` calls). Extracted from the CLI's inline `--project-init/
+  -up/-down` handlers so the CLI and the new GUI page share one implementation
+  instead of duplicating it — CLI refactored to call it, behavior unchanged
+  (re-verified with a fresh smoke test).
+- `ProjectEnv::availableTypes()` added — the type keys in `project-types.json`
+  (skips `_`-prefixed comment keys), falling back to `{"cpp","nextjs"}`.
+- `app/gui/pages/projects_page.{h,cpp}`: folder picker (`QFileDialog`), name +
+  type fields, "Generate Files" (sync, just two small text writes) plus async
+  "Up"/"Down" (`QtConcurrent` + confirm dialog, same pattern as Settings/
+  Snapshot pages), output log. New sidebar section "Containers" (Projects) and
+  "General" (Settings, given its own header now instead of falling under
+  "Migration").
+- `gui/main.cpp` dev hooks gained `--shot-fill "<placeholder>=<value>;..."`
+  (types into `QLineEdit`s by placeholder-text substring) alongside
+  `--shot-click`, so a full fill+click flow is screenshot-testable headlessly.
+- New test `tst_project_control` (writeFiles creates both files / rejects a
+  host-profile spec). 14 suites total.
+- Verified against the real running app: Projects page renders; filling
+  folder+name and clicking "Generate Files" actually wrote a correct
+  `docker-compose.yml` + `devcontainer.json` to disk and the Up/Down buttons
+  correctly enabled afterward. `Up`/`Down` themselves reuse the exact
+  `ProjectControl` calls already proven against real Docker via the CLI
+  (P11.2/11.3 smoke + this session's CLI re-verification after the refactor).
+- **Docx sections to touch:** §2.1 module table (add `project_control`), §2.2
+  GUI (Projects page), §11 컨테이너 트랙 (note the GUI path alongside the CLI),
+  §13 tests (14 suites, add `tst_project_control`).
+
 ---
 
 ## How to use this file

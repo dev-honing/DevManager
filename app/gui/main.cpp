@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QDialogButtonBox>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTimer>
@@ -47,9 +48,23 @@ int main(int argc, char** argv)
         const bool create = args.contains("--shot-create");  // click a "Create ..." button
         const int ci = args.indexOf("--shot-click");   // dev: click any button by visible text
         const QString clickText = (ci >= 0 && ci + 1 < args.size()) ? args.at(ci + 1) : QString();
-        QTimer::singleShot(8000, &w, [&w, path, nav, dry, create, clickText] {
+        // dev: "--shot-fill <placeholder>=<value>;<placeholder2>=<value2>" types into
+        // QLineEdits found by placeholder-text substring
+        const int fi = args.indexOf("--shot-fill");
+        const QString fillSpec = (fi >= 0 && fi + 1 < args.size()) ? args.at(fi + 1) : QString();
+        QTimer::singleShot(8000, &w, [&w, path, nav, dry, create, clickText, fillSpec] {
             if (!nav.isEmpty())
                 w.selectPage(nav);
+            if (!fillSpec.isEmpty()) {
+                for (const QString& pair : fillSpec.split(';', Qt::SkipEmptyParts)) {
+                    const int eq = pair.indexOf('=');
+                    if (eq < 0) continue;
+                    const QString ph = pair.left(eq), val = pair.mid(eq + 1);
+                    for (auto* e : w.findChildren<QLineEdit*>())
+                        if (e->isVisible() && e->placeholderText().contains(ph))
+                            e->setText(val);
+                }
+            }
             if (dry) {
                 for (auto* b : w.findChildren<QPushButton*>("dryCheckBtn"))
                     if (b->isVisible() && b->isEnabled())
